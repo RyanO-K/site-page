@@ -46,9 +46,24 @@ function writeProjects(projects: Project[]): void {
 }
 
 function getSessionUser(req: http.IncomingMessage): string | null {
+  // Test-only auth bypass: opt-in via env, never set in production (Railway).
+  if (process.env.TEST_AUTH_BYPASS && process.env.NODE_ENV !== 'production') {
+    return process.env.TEST_AUTH_BYPASS;
+  }
   const match = (req.headers.cookie ?? '').match(/session=([a-f0-9]+)/);
   if (!match) return null;
   return sessions.get(match[1]) ?? null;
+}
+
+/** Safely parse a request body as JSON. Returns null on empty/invalid input. */
+function parseJsonBody(raw: string): Record<string, unknown> | null {
+  if (!raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
 }
 
 function setCookie(res: http.ServerResponse, token: string): void {
@@ -146,15 +161,34 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (method === 'POST' && urlPath === '/api/projects') {
-      if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
-      const body = JSON.parse(await readBody(req));
-      const repo = normalizeRepo(body.repo ?? '');
-      const hostedUrl: string = body.url?.trim();
-      if (!repo || !hostedUrl) { json(res, 400, { error: 'repo (owner/name) and url are required' }); return; }
+      const user = getSessionUser(req);
+      if (!user) {
+        console.warn('[projects] POST rejected: unauthenticated');
+        json(res, 401, { error: 'Unauthorized' }); return;
+      }
+
+      const raw = await readBody(req);
+      console.log(`[projects] POST by ${user} — content-type=${req.headers['content-type'] ?? 'none'} body=${raw.length} bytes`);
+
+      const body = parseJsonBody(raw);
+      if (!body) {
+        console.warn(`[projects] POST rejected: body is not valid JSON (got: ${raw.slice(0, 80)})`);
+        json(res, 400, { error: 'Request body must be JSON with "repo" and "url" fields' });
+        return;
+      }
+
+      const repo = normalizeRepo(typeof body.repo === 'string' ? body.repo : '');
+      const hostedUrl = typeof body.url === 'string' ? body.url.trim() : '';
+      console.log(`[projects] parsed repo="${repo}" url="${hostedUrl}"`);
+      if (!repo || !hostedUrl) {
+        console.warn('[projects] POST rejected: missing repo or url after parsing');
+        json(res, 400, { error: 'repo (owner/name) and url are required' }); return;
+      }
 
       const ghHeaders: Record<string, string> = { 'User-Agent': 'portfolio', Accept: 'application/vnd.github+json' };
       if (process.env.GITHUB_TOKEN) ghHeaders.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
 
+      console.log(`[projects] fetching GitHub metadata for ${repo}`);
       const ghRes = await fetch(`https://api.github.com/repos/${repo}`, { headers: ghHeaders });
       if (!ghRes.ok) {
         const detail = ghRes.status === 404
@@ -162,6 +196,7 @@ const server = http.createServer(async (req, res) => {
           : ghRes.status === 403
             ? 'GitHub API rate limit hit (set GITHUB_TOKEN to raise it)'
             : `GitHub API error ${ghRes.status}`;
+        console.warn(`[projects] GitHub lookup failed (${ghRes.status}): ${detail}`);
         json(res, 400, { error: detail });
         return;
       }
@@ -179,6 +214,7 @@ const server = http.createServer(async (req, res) => {
       const projects = readProjects();
       projects.unshift(project);
       writeProjects(projects);
+      console.log(`[projects] added "${project.name}" (id=${project.id}); total now ${projects.length}`);
       json(res, 201, project); return;
     }
 
