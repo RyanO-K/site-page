@@ -344,18 +344,3 @@ a:hover { text-decoration: underline; }
 
 .site-footer a { color: var(--muted); }
 .site-footer a:hover { color: var(--text); text-decoration: none; }
-
-/* ── Snake page iframe ───────────────────────────── */
-.game-frame-wrap {
-  position: fixed;
-  inset: var(--nav-h) 0 0 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.game-frame-wrap iframe {
-  flex: 1;
-  border: none;
-  width: 100%;
-  height: 100%;
-}
