@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ryan O'Keefe</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav">
+      <span class="nav-logo">Ryan O'Keefe</span>
+      <ul class="nav-links">
+        <li><a href="#about">About</a></li>
+        <li><a href="#projects">Projects</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-content">
+        <h1>Hi, I'm Ryan.</h1>
+        <p class="hero-sub">Software developer. Builder of things.</p>
+      </div>
+    </section>
+
+    <section id="about" class="section">
+      <div class="container">
+        <h2>About</h2>
+        <p>I build software with a focus on clean code and practical solutions. Currently exploring full-stack development and game mechanics.</p>
+      </div>
+    </section>
+
+    <section id="projects" class="section section-alt">
+      <div class="container">
+        <h2>Projects</h2>
+        <div class="project-grid">
+
+          <div class="project-card" onclick="window.location.href='snake-game/'">
+            <div class="project-preview">
+              <iframe
+                src="https://snake-game-production-b39f.up.railway.app"
+                title="Snake Game"
+                scrolling="no"
+                tabindex="-1"
+                aria-hidden="true"
+              ></iframe>
+              <div class="preview-overlay">
+                <span class="play-label">Play Snake →</span>
+              </div>
+            </div>
+            <div class="project-info">
+              <h3>Snake Game</h3>
+              <p>Classic snake built with TypeScript — playable in the browser with a live leaderboard.</p>
+              <a href="snake-game/" class="btn">Open Game</a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="section">
+      <div class="container">
+        <h2>Contact</h2>
+        <p>Reach me at <a href="mailto:rokeefe@barnumfg.com">rokeefe@barnumfg.com</a> or find me on <a href="https://github.com/RyanO-K" target="_blank" rel="noopener">GitHub</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 Ryan O'Keefe · <a href="https://okeefe.work">okeefe.work</a></p>
+  </footer>
+</body>
+</html>
