@@ -26,6 +26,16 @@ interface Project {
   addedAt: number;
 }
 
+/** Accept "owner/name", a full github.com URL, or a trailing .git — return "owner/name". */
+function normalizeRepo(input: string): string {
+  let s = input.trim();
+  s = s.replace(/^https?:\/\/github\.com\//i, '');
+  s = s.replace(/\.git$/i, '');
+  s = s.replace(/^\/+|\/+$/g, '');
+  const parts = s.split('/');
+  return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : '';
+}
+
 function readProjects(): Project[] {
   try { return JSON.parse(fs.readFileSync(PROJECTS_PATH, 'utf-8')); }
   catch { return []; }
@@ -138,13 +148,24 @@ const server = http.createServer(async (req, res) => {
     if (method === 'POST' && urlPath === '/api/projects') {
       if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
       const body = JSON.parse(await readBody(req));
-      const repo: string = body.repo?.trim();
+      const repo = normalizeRepo(body.repo ?? '');
       const hostedUrl: string = body.url?.trim();
-      if (!repo || !hostedUrl) { json(res, 400, { error: 'repo and url required' }); return; }
+      if (!repo || !hostedUrl) { json(res, 400, { error: 'repo (owner/name) and url are required' }); return; }
 
-      const ghRepo = await fetchJson(`https://api.github.com/repos/${repo}`, {
-        headers: { 'User-Agent': 'portfolio' },
-      });
+      const ghHeaders: Record<string, string> = { 'User-Agent': 'portfolio', Accept: 'application/vnd.github+json' };
+      if (process.env.GITHUB_TOKEN) ghHeaders.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+
+      const ghRes = await fetch(`https://api.github.com/repos/${repo}`, { headers: ghHeaders });
+      if (!ghRes.ok) {
+        const detail = ghRes.status === 404
+          ? `Repo "${repo}" not found (check owner/name, or it may be private — set GITHUB_TOKEN to allow private repos)`
+          : ghRes.status === 403
+            ? 'GitHub API rate limit hit (set GITHUB_TOKEN to raise it)'
+            : `GitHub API error ${ghRes.status}`;
+        json(res, 400, { error: detail });
+        return;
+      }
+      const ghRepo = await ghRes.json() as any;
       const project: Project = {
         id: randomBytes(8).toString('hex'),
         repo,
