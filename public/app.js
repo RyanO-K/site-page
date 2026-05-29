@@ -37,21 +37,25 @@ function setupAdminPanel() {
     e.preventDefault();
     const repo = document.getElementById('input-repo').value.trim();
     const url = document.getElementById('input-url').value.trim();
+    const payload = { repo, url };
+    console.log('[add-project] submit intercepted; payload =', payload);
     const btn = e.target.querySelector('button');
     const errEl = document.getElementById('add-error');
     errEl.hidden = true;
     btn.disabled = true;
     btn.textContent = 'Adding…';
     try {
-      await apiFetch('/api/projects', {
+      const created = await apiFetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, url }),
+        body: JSON.stringify(payload),
       });
+      console.log('[add-project] success:', created);
       document.getElementById('input-repo').value = '';
       document.getElementById('input-url').value = '';
       await loadProjects();
     } catch (err) {
+      console.error('[add-project] failed:', err.message);
       errEl.textContent = err.message;
       errEl.hidden = false;
     } finally {
