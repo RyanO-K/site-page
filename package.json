@@ -11,12 +11,10 @@
     "dev": "npm run build && npm start",
     "test": "npm run build && node --test \"tests/**/*.test.mjs\""
   },
-  "devDependencies": {
+  "dependencies": {
     "@types/node": "^20.0.0",
     "@types/pg": "^8.20.0",
+    "pg": "^8.22.0",
     "typescript": "^5.4.0"
-  },
-  "dependencies": {
-    "pg": "^8.22.0"
   }
 }
