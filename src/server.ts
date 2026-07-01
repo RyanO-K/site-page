@@ -2,29 +2,19 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { randomBytes } from 'crypto';
+import { createStore, Project } from './store';
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
-const PROJECTS_PATH = path.resolve(__dirname, '../projects.json');
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
 const GITHUB_OWNER = process.env.GITHUB_OWNER!;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
+const store = createStore();
 const sessions = new Map<string, string>();
 const oauthStates = new Set<string>();
-
-interface Project {
-  id: string;
-  repo: string;
-  name: string;
-  description: string;
-  language: string;
-  url: string;
-  githubUrl: string;
-  addedAt: number;
-}
 
 /** Accept "owner/name", a full github.com URL, or a trailing .git — return "owner/name". */
 function normalizeRepo(input: string): string {
@@ -34,15 +24,6 @@ function normalizeRepo(input: string): string {
   s = s.replace(/^\/+|\/+$/g, '');
   const parts = s.split('/');
   return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : '';
-}
-
-function readProjects(): Project[] {
-  try { return JSON.parse(fs.readFileSync(PROJECTS_PATH, 'utf-8')); }
-  catch { return []; }
-}
-
-function writeProjects(projects: Project[]): void {
-  fs.writeFileSync(PROJECTS_PATH, JSON.stringify(projects, null, 2));
 }
 
 function getSessionUser(req: http.IncomingMessage): string | null {
@@ -157,7 +138,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (method === 'GET' && urlPath === '/api/projects') {
-      json(res, 200, readProjects()); return;
+      json(res, 200, await store.list()); return;
     }
 
     if (method === 'POST' && urlPath === '/api/projects') {
@@ -211,17 +192,15 @@ const server = http.createServer(async (req, res) => {
         githubUrl: ghRepo.html_url,
         addedAt: Date.now(),
       };
-      const projects = readProjects();
-      projects.unshift(project);
-      writeProjects(projects);
-      console.log(`[projects] added "${project.name}" (id=${project.id}); total now ${projects.length}`);
+      await store.add(project);
+      console.log(`[projects] added "${project.name}" (id=${project.id})`);
       json(res, 201, project); return;
     }
 
     if (method === 'DELETE' && urlPath.startsWith('/api/projects/')) {
       if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
       const id = urlPath.split('/').pop();
-      writeProjects(readProjects().filter(p => p.id !== id));
+      if (id) await store.remove(id);
       json(res, 200, { ok: true }); return;
     }
 
