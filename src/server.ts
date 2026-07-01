@@ -11,6 +11,11 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
 const GITHUB_OWNER = process.env.GITHUB_OWNER!;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+// Explicit OAuth callback, wired to BASE_URL so login is domain-portable
+// (onrender.com now, okeefe.work after cutover). GitHub requires this to be
+// registered on the OAuth app's callback allowlist and to match between the
+// authorize redirect and the token exchange.
+const OAUTH_REDIRECT_URI = `${BASE_URL}/auth/callback`;
 
 const store = createStore();
 const sessions = new Map<string, string>();
@@ -100,7 +105,7 @@ const server = http.createServer(async (req, res) => {
       const state = randomBytes(16).toString('hex');
       oauthStates.add(state);
       setTimeout(() => oauthStates.delete(state), 10 * 60 * 1000);
-      res.writeHead(302, { Location: `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=read:user&state=${state}` });
+      res.writeHead(302, { Location: `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(OAUTH_REDIRECT_URI)}&scope=read:user&state=${state}` });
       res.end(); return;
     }
 
@@ -112,7 +117,7 @@ const server = http.createServer(async (req, res) => {
       const tokenData = await fetchJson('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ client_id: GITHUB_CLIENT_ID, client_secret: GITHUB_CLIENT_SECRET, code }),
+        body: JSON.stringify({ client_id: GITHUB_CLIENT_ID, client_secret: GITHUB_CLIENT_SECRET, code, redirect_uri: OAUTH_REDIRECT_URI }),
       });
       const ghUser = await fetchJson('https://api.github.com/user', {
         headers: { Authorization: `Bearer ${tokenData.access_token}`, 'User-Agent': 'portfolio' },
