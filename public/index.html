@@ -30,8 +30,16 @@
     <section id="about" class="section">
       <div class="container">
         <h2>About</h2>
-        <p>I build software with a focus on test driven development and user driven configuration.</p>
-        <p>Currently exploring CI/CD pipelines and infrastructure as code.</p>
+        <div id="about-content"><!-- filled by JS --></div>
+        <div id="about-edit" hidden>
+          <textarea id="about-textarea" rows="8"></textarea>
+          <div class="about-edit-actions">
+            <button id="about-save">Save</button>
+            <button id="about-cancel" class="btn-ghost">Cancel</button>
+          </div>
+          <p id="about-error" class="add-error" hidden></p>
+        </div>
+        <button id="about-edit-btn" hidden>Edit</button>
       </div>
     </section>
 

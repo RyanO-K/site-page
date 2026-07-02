@@ -137,6 +137,21 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { user: getSessionUser(req) }); return;
     }
 
+    if (method === 'GET' && urlPath === '/api/about') {
+      json(res, 200, { content: await store.getAbout() }); return;
+    }
+
+    if (method === 'PUT' && urlPath === '/api/about') {
+      if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
+      const raw = await readBody(req);
+      const body = parseJsonBody(raw);
+      if (!body || typeof body.content !== 'string') {
+        json(res, 400, { error: 'content field required' }); return;
+      }
+      await store.setAbout(body.content as string);
+      json(res, 200, { ok: true }); return;
+    }
+
     if (method === 'GET' && urlPath === '/api/projects') {
       json(res, 200, await store.list()); return;
     }
