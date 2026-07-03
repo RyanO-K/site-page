@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ryan O'Keefe</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav">
+      <span class="nav-logo">Ryan O'Keefe</span>
+      <ul class="nav-links">
+        <li><a href="#about">About</a></li>
+        <li><a href="#projects">Projects</a></li>
+        <li><a href="#contact">Contact</a></li>
+        <li id="auth-item"><!-- filled by JS --></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-content">
+        <h1>Hi, I'm Ryan.</h1>
+        <p class="hero-sub">Software developer.</p>
+      </div>
+    </section>
+
+    <section id="about" class="section">
+      <div class="container">
+        <h2>About</h2>
+        <div id="about-content"><!-- filled by JS --></div>
+        <div id="about-edit" hidden>
+          <textarea id="about-textarea" rows="8"></textarea>
+          <div class="about-edit-actions">
+            <button id="about-save">Save</button>
+            <button id="about-cancel" class="btn-ghost">Cancel</button>
+          </div>
+          <p id="about-error" class="add-error" hidden></p>
+        </div>
+        <button id="about-edit-btn" hidden>Edit</button>
+      </div>
+    </section>
+
+    <section id="projects" class="section section-alt">
+      <div class="container">
+        <h2>Projects</h2>
+
+        <div id="admin-panel" hidden>
+          <form id="add-form">
+            <input type="text" id="input-repo" placeholder="owner/repo" required />
+            <input type="url" id="input-url" placeholder="Hosted URL" required />
+            <button type="submit">Add Project</button>
+          </form>
+          <p id="add-error" class="add-error" hidden></p>
+        </div>
+
+        <div id="project-grid" class="project-grid">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="section">
+      <div class="container">
+        <h2>Contact</h2>
+        <p>Reach me at <a href="mailto:rokeefe@okeefe.work">rokeefe@okeefe.work</a> or find me on <a href="https://github.com/RyanO-K" target="_blank" rel="noopener">GitHub</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 Ryan O'Keefe · <a href="https://okeefe.work">okeefe.work</a></p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

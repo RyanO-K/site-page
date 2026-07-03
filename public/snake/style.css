@@ -1,0 +1,130 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+
+body {
+  background: #1a1a2e;
+  color: #eaeaea;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+#app {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+#game-container {
+  border: 2px solid #e94560;
+  box-shadow: 0 0 24px rgba(233, 69, 96, 0.4);
+}
+
+#game-canvas {
+  display: block;
+}
+
+#score-panel {
+  min-width: 160px;
+  padding: 1rem;
+  border: 1px solid #333;
+  background: #16213e;
+}
+
+#score-panel h2 {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #e94560;
+  margin-bottom: 0.75rem;
+}
+
+#score-list {
+  list-style: none;
+  padding: 0;
+  font-size: 0.85rem;
+  line-height: 1.8;
+}
+
+#score-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #222;
+  padding: 2px 0;
+}
+
+/* HUD bar above canvas */
+#hud {
+  background: #16213e;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  color: #eaeaea;
+  border-bottom: 1px solid #e94560;
+}
+
+/* Start button — shown in IDLE/GAME_OVER, hidden otherwise (controlled by main.ts) */
+#start-btn {
+  display: block;
+  margin: 12px auto 0;
+  padding: 10px 32px;
+  background: #e94560;
+  color: #eaeaea;
+  border: none;
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+#start-btn:hover { background: #c23152; }
+
+/* Game-over overlay — centered over canvas area */
+#game-over-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.85);
+  color: #eaeaea;
+  padding: 2rem;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  z-index: 10;
+  min-width: 220px;
+}
+#game-over-overlay h3 {
+  color: #e94560;
+  font-size: 1.6rem;
+  margin-bottom: 0.5rem;
+}
+#game-over-overlay p { margin-bottom: 1rem; font-size: 1rem; }
+#initials-input {
+  width: 80px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  font-size: 1.2rem;
+  padding: 6px;
+  background: #16213e;
+  color: #eaeaea;
+  border: 1px solid #e94560;
+  text-transform: uppercase;
+  display: block;
+  margin: 0 auto 0.75rem;
+}
+#submit-score-btn {
+  padding: 8px 24px;
+  background: #e94560;
+  color: #eaeaea;
+  border: none;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+#submit-score-btn:hover { background: #c23152; }
+
+/* Ensure game-container is positioned so the overlay can be absolute within it */
+#game-container { position: relative; }

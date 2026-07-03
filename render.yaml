@@ -1,0 +1,31 @@
+# Render Blueprint for site-page.
+# Create via Render dashboard → "New +" → "Blueprint" and point it at this repo,
+# or configure a Web Service manually with the build/start commands below.
+#
+# NOTE: `--include=dev` is required. NODE_ENV=production (set below) also applies
+# at build time, and a plain `npm install` would then skip devDependencies —
+# omitting TypeScript and breaking `npm run build`.
+services:
+  - type: web
+    name: site-page
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GITHUB_OWNER
+        value: RyanO-K
+      - key: BASE_URL
+        value: https://www.okeefe.work
+      # Secrets — set these in the Render dashboard (sync: false keeps them out of git):
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: DATABASE_URL        # Neon connection string (include ?sslmode=require)
+        sync: false
+      - key: GITHUB_TOKEN        # optional: raises GitHub API rate limit / allows private repos
+        sync: false

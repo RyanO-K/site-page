@@ -13,6 +13,7 @@
   --muted: #888;
   --accent: #4ade80;
   --accent-dim: #22c55e33;
+  --danger: #ef4444;
   --radius: 10px;
   --nav-h: 60px;
 }
@@ -58,6 +59,7 @@ body {
   list-style: none;
   display: flex;
   gap: 2rem;
+  align-items: center;
 }
 
 .nav-links a {
@@ -68,6 +70,24 @@ body {
 }
 
 .nav-links a:hover { color: var(--text); }
+
+#auth-item a, #auth-item button {
+  font-size: .8rem;
+  padding: .3rem .75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color .2s, color .2s;
+}
+
+#auth-item a:hover, #auth-item button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  text-decoration: none;
+}
 
 /* ── Hero ────────────────────────────────────────── */
 .hero {
@@ -118,6 +138,49 @@ p { color: var(--muted); max-width: 640px; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+/* ── Admin Panel ─────────────────────────────────── */
+#admin-panel {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+#add-form {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+#add-form input {
+  flex: 1;
+  min-width: 180px;
+  padding: .45rem .75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: .875rem;
+}
+
+#add-form input:focus { outline: none; border-color: var(--accent); }
+
+#add-form button {
+  padding: .45rem 1.1rem;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: .875rem;
+}
+
+#add-form button:disabled { opacity: .5; cursor: default; }
+
+.add-error { color: var(--danger); font-size: .825rem; margin-top: .5rem; }
+
 /* ── Project Grid ────────────────────────────────── */
 .project-grid {
   display: grid;
@@ -133,6 +196,7 @@ a:hover { text-decoration: underline; }
   overflow: hidden;
   cursor: pointer;
   transition: border-color .2s, transform .2s;
+  position: relative;
 }
 
 .project-card:hover {
@@ -156,14 +220,6 @@ a:hover { text-decoration: underline; }
   transform-origin: top left;
   border: none;
   pointer-events: none;
-  display: block;
-}
-
-.project-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top;
   display: block;
 }
 
@@ -208,6 +264,23 @@ a:hover { text-decoration: underline; }
   margin-bottom: 1rem;
 }
 
+.project-meta {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .8rem;
+  color: var(--muted);
+  margin-bottom: .75rem;
+}
+
+.lang-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 .btn {
   display: inline-block;
   padding: .45rem 1rem;
@@ -218,6 +291,7 @@ a:hover { text-decoration: underline; }
   font-weight: 600;
   text-decoration: none;
   transition: background .2s, color .2s;
+  margin-right: .5rem;
 }
 
 .btn:hover {
@@ -225,6 +299,100 @@ a:hover { text-decoration: underline; }
   color: #000;
   text-decoration: none;
 }
+
+.btn-ghost {
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.btn-ghost:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.delete-btn {
+  position: absolute;
+  top: .6rem;
+  right: .6rem;
+  background: rgba(0,0,0,.6);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 4px;
+  z-index: 2;
+}
+
+.delete-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+.empty-state {
+  color: var(--muted);
+  grid-column: 1/-1;
+  padding: 3rem 0;
+}
+
+/* ── About Edit ──────────────────────────────────── */
+#about-textarea {
+  width: 100%;
+  max-width: 640px;
+  padding: .6rem .75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: .875rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+#about-textarea:focus { outline: none; border-color: var(--accent); }
+
+.about-edit-actions {
+  display: flex;
+  gap: .5rem;
+  margin-top: .75rem;
+}
+
+#about-save {
+  padding: .4rem 1rem;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: .875rem;
+}
+
+#about-save:disabled { opacity: .5; cursor: default; }
+
+#about-cancel {
+  padding: .4rem 1rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .875rem;
+}
+
+#about-cancel:hover { border-color: var(--text); color: var(--text); }
+
+#about-edit-btn {
+  margin-top: 1rem;
+  padding: .35rem .9rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .8rem;
+}
+
+#about-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ── Footer ──────────────────────────────────────── */
 .site-footer {
@@ -237,18 +405,3 @@ a:hover { text-decoration: underline; }
 
 .site-footer a { color: var(--muted); }
 .site-footer a:hover { color: var(--text); text-decoration: none; }
-
-/* ── Snake page iframe ───────────────────────────── */
-.game-frame-wrap {
-  position: fixed;
-  inset: var(--nav-h) 0 0 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.game-frame-wrap iframe {
-  flex: 1;
-  border: none;
-  width: 100%;
-  height: 100%;
-}

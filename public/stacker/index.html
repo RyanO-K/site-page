@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stacker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="game-container" data-game-status="IDLE">
+      <div id="hud">
+        <span>SCORE:&nbsp;<span data-testid="score" id="score-display">0</span></span>
+        <span>LEVEL:&nbsp;<span data-testid="level" id="level-display">1</span></span>
+      </div>
+      <canvas id="game-canvas" data-testid="game-canvas"></canvas>
+      <button data-testid="start-btn" id="start-btn">PLAY</button>
+
+      <div id="game-over-overlay" data-testid="game-over-overlay" hidden>
+        <h3>GAME OVER</h3>
+        <p>Score: <span data-testid="final-score" id="final-score">0</span></p>
+        <input
+          type="text"
+          data-testid="initials-input"
+          id="initials-input"
+          maxlength="3"
+          placeholder="AAA"
+          autocomplete="off"
+        />
+        <button data-testid="submit-score-btn" id="submit-score-btn">Submit</button>
+      </div>
+    </div>
+
+    <div id="score-panel">
+      <h2>High Scores</h2>
+      <ol id="score-list"></ol>
+    </div>
+  </div>
+  <script src="bundle.js"></script>
+</body>
+</html>
