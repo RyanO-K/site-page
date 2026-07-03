@@ -6,6 +6,7 @@ import { createStore, Project } from './store';
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
+const SCORES_FILE = path.resolve(__dirname, '../scores.json');
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
@@ -15,6 +16,23 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const store = createStore();
 const sessions = new Map<string, string>();
 const oauthStates = new Set<string>();
+
+interface ScoreEntry { name: string; score: number; timestamp: number; }
+interface ScoreBoard { entries: ScoreEntry[]; highScore: number; }
+const MAX_HIGH_SCORES = 10;
+
+function readScoreBoard(): ScoreBoard {
+  try {
+    const raw = fs.readFileSync(SCORES_FILE, 'utf-8');
+    return JSON.parse(raw) as ScoreBoard;
+  } catch {
+    return { entries: [], highScore: 0 };
+  }
+}
+
+function writeScoreBoard(board: ScoreBoard): void {
+  fs.writeFileSync(SCORES_FILE, JSON.stringify(board, null, 2), 'utf-8');
+}
 
 /** Accept "owner/name", a full github.com URL, or a trailing .git — return "owner/name". */
 function normalizeRepo(input: string): string {
@@ -217,6 +235,42 @@ const server = http.createServer(async (req, res) => {
       const id = urlPath.split('/').pop();
       if (id) await store.remove(id);
       json(res, 200, { ok: true }); return;
+    }
+
+    if (method === 'GET' && urlPath === '/snake/api/scores') {
+      const board = readScoreBoard();
+      json(res, 200, board); return;
+    }
+
+    if (method === 'POST' && urlPath === '/snake/api/scores') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const entry = JSON.parse(body) as ScoreEntry;
+          const board = readScoreBoard();
+          const merged = [...board.entries, entry]
+            .sort((a, b) => b.score - a.score || a.timestamp - b.timestamp)
+            .slice(0, MAX_HIGH_SCORES);
+          const updated: ScoreBoard = { entries: merged, highScore: merged[0]?.score ?? 0 };
+          writeScoreBoard(updated);
+          json(res, 200, updated);
+        } catch {
+          res.writeHead(400);
+          res.end('Bad request');
+        }
+      }); return;
+    }
+
+    if (urlPath.startsWith('/snake/')) {
+      const snakePath = urlPath.slice(7) || '/';
+      const staticPath = path.join(PUBLIC_DIR, '/snake', snakePath === '/' ? '/index.html' : snakePath);
+      const ext = path.extname(staticPath);
+      fs.readFile(staticPath, (err, data) => {
+        if (err) { res.writeHead(404); res.end('Not found'); return; }
+        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+        res.end(data);
+      }); return;
     }
 
     serveStatic(res, urlPath);
