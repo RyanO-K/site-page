@@ -23,11 +23,21 @@ export interface Store {
   list(): Promise<Project[]>;
   add(project: Project): Promise<void>;
   remove(id: string): Promise<void>;
+  getAbout(): Promise<string>;
+  setAbout(content: string): Promise<void>;
 }
+
+const DEFAULT_ABOUT = `Currently exploring CI/CD pipelines and infrastructure as code.
+
+I build software with a focus on test driven development and user driven configuration.`;
 
 /** JSON-file backend. Newest-first is maintained by unshifting on add. */
 class FileStore implements Store {
-  constructor(private readonly file: string) {}
+  private readonly aboutFile: string;
+
+  constructor(private readonly file: string) {
+    this.aboutFile = file.replace(/projects\.json$/, 'about.md');
+  }
 
   async list(): Promise<Project[]> {
     try {
@@ -47,6 +57,18 @@ class FileStore implements Store {
   async remove(id: string): Promise<void> {
     const all = (await this.list()).filter(p => p.id !== id);
     fs.writeFileSync(this.file, JSON.stringify(all, null, 2));
+  }
+
+  async getAbout(): Promise<string> {
+    try {
+      return fs.readFileSync(this.aboutFile, 'utf-8');
+    } catch {
+      return DEFAULT_ABOUT;
+    }
+  }
+
+  async setAbout(content: string): Promise<void> {
+    fs.writeFileSync(this.aboutFile, content);
   }
 }
 
@@ -69,6 +91,12 @@ class PgStore implements Store {
         url         text NOT NULL,
         github_url  text NOT NULL,
         added_at    bigint NOT NULL
+      )
+    `);
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key   text PRIMARY KEY,
+        value text NOT NULL
       )
     `);
   }
@@ -99,6 +127,23 @@ class PgStore implements Store {
   async remove(id: string): Promise<void> {
     await this.ready;
     await this.pool.query('DELETE FROM projects WHERE id = $1', [id]);
+  }
+
+  async getAbout(): Promise<string> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT value FROM settings WHERE key = 'about'`,
+    );
+    return rows[0]?.value ?? DEFAULT_ABOUT;
+  }
+
+  async setAbout(content: string): Promise<void> {
+    await this.ready;
+    await this.pool.query(
+      `INSERT INTO settings (key, value) VALUES ('about', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [content],
+    );
   }
 }
 

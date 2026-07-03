@@ -10,8 +10,12 @@ async function init() {
   const me = await apiFetch('/api/me');
   currentUser = me.user;
   renderAuth();
+  await loadAbout();
   await loadProjects();
-  if (currentUser) setupAdminPanel();
+  if (currentUser) {
+    setupAdminPanel();
+    setupAboutEdit();
+  }
 }
 
 function renderAuth() {
@@ -23,11 +27,88 @@ function renderAuth() {
       currentUser = null;
       renderAuth();
       document.getElementById('admin-panel').hidden = true;
+      document.getElementById('about-edit-btn').hidden = true;
       await loadProjects();
     });
   } else {
     item.innerHTML = `<a href="/auth/github">Login</a>`;
   }
+}
+
+/** Minimal markdown → HTML: paragraphs, bold, italic, links, inline code. */
+function renderMarkdown(md) {
+  const escaped = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const paragraphs = escaped.split(/\n\n+/).map(block => {
+    const inline = block
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/\n/g, '<br>');
+    return `<p>${inline}</p>`;
+  });
+
+  return paragraphs.join('\n');
+}
+
+async function loadAbout() {
+  const { content } = await apiFetch('/api/about');
+  document.getElementById('about-content').innerHTML = renderMarkdown(content);
+  const ta = document.getElementById('about-textarea');
+  if (ta) ta.value = content;
+}
+
+function setupAboutEdit() {
+  const editBtn = document.getElementById('about-edit-btn');
+  const editPanel = document.getElementById('about-edit');
+  const contentDiv = document.getElementById('about-content');
+  const saveBtn = document.getElementById('about-save');
+  const cancelBtn = document.getElementById('about-cancel');
+  const errEl = document.getElementById('about-error');
+
+  editBtn.hidden = false;
+
+  editBtn.addEventListener('click', () => {
+    editBtn.hidden = true;
+    contentDiv.hidden = true;
+    editPanel.hidden = false;
+    errEl.hidden = true;
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    editPanel.hidden = true;
+    contentDiv.hidden = false;
+    editBtn.hidden = false;
+    errEl.hidden = true;
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const content = document.getElementById('about-textarea').value;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    errEl.hidden = true;
+    try {
+      await apiFetch('/api/about', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      contentDiv.innerHTML = renderMarkdown(content);
+      editPanel.hidden = true;
+      contentDiv.hidden = false;
+      editBtn.hidden = false;
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  });
 }
 
 function setupAdminPanel() {
