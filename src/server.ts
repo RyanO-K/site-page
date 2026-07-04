@@ -7,6 +7,7 @@ import { createStore, Project } from './store';
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
 const SCORES_FILE = path.resolve(__dirname, '../scores.json');
+const STACKER_SCORES_FILE = path.resolve(__dirname, '../stacker-scores.json');
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
@@ -32,6 +33,19 @@ function readScoreBoard(): ScoreBoard {
 
 function writeScoreBoard(board: ScoreBoard): void {
   fs.writeFileSync(SCORES_FILE, JSON.stringify(board, null, 2), 'utf-8');
+}
+
+function readStackerScoreBoard(): ScoreBoard {
+  try {
+    const raw = fs.readFileSync(STACKER_SCORES_FILE, 'utf-8');
+    return JSON.parse(raw) as ScoreBoard;
+  } catch {
+    return { entries: [], highScore: 0 };
+  }
+}
+
+function writeStackerScoreBoard(board: ScoreBoard): void {
+  fs.writeFileSync(STACKER_SCORES_FILE, JSON.stringify(board, null, 2), 'utf-8');
 }
 
 /** Accept "owner/name", a full github.com URL, or a trailing .git — return "owner/name". */
@@ -265,6 +279,85 @@ const server = http.createServer(async (req, res) => {
     if (urlPath.startsWith('/snake/')) {
       const snakePath = urlPath.slice(7) || '/';
       const staticPath = path.join(PUBLIC_DIR, '/snake', snakePath === '/' ? '/index.html' : snakePath);
+      const ext = path.extname(staticPath);
+      fs.readFile(staticPath, (err, data) => {
+        if (err) { res.writeHead(404); res.end('Not found'); return; }
+        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+        res.end(data);
+      }); return;
+    }
+
+    if (method === 'GET' && urlPath === '/stacker/api/scores') {
+      const board = readStackerScoreBoard();
+      json(res, 200, board); return;
+    }
+
+    if (method === 'POST' && urlPath === '/stacker/api/scores') {
+      let body = '';
+      req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const entry = JSON.parse(body) as ScoreEntry;
+          const board = readStackerScoreBoard();
+          const merged = [...board.entries, entry]
+            .sort((a, b) => b.score - a.score || a.timestamp - b.timestamp)
+            .slice(0, MAX_HIGH_SCORES);
+          const updated: ScoreBoard = { entries: merged, highScore: merged[0]?.score ?? 0 };
+          writeStackerScoreBoard(updated);
+          json(res, 200, updated);
+        } catch {
+          res.writeHead(400);
+          res.end('Bad request');
+        }
+      }); return;
+    }
+
+    if (urlPath === '/stacker') {
+      res.writeHead(301, { Location: '/stacker/' });
+      res.end(); return;
+    }
+
+    if (urlPath.startsWith('/stacker/')) {
+      const stackerPath = urlPath.slice(9) || '/';
+      const staticPath = path.join(PUBLIC_DIR, '/stacker', stackerPath === '/' ? '/index.html' : stackerPath);
+      const ext = path.extname(staticPath);
+      fs.readFile(staticPath, (err, data) => {
+        if (err) { res.writeHead(404); res.end('Not found'); return; }
+        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+        res.end(data);
+      }); return;
+    }
+
+    // Kanban showcase — a self-contained static page (no backend). Mirrors the
+    // stacker/snake blocks: 301 the bare path to the trailing-slash form, then
+    // serve files from public/kanban/ with the shared MIME handling and 404s.
+    if (urlPath === '/kanban') {
+      res.writeHead(301, { Location: '/kanban/' });
+      res.end(); return;
+    }
+
+    if (urlPath.startsWith('/kanban/')) {
+      const kanbanPath = urlPath.slice(8) || '/';
+      const staticPath = path.join(PUBLIC_DIR, '/kanban', kanbanPath === '/' ? '/index.html' : kanbanPath);
+      const ext = path.extname(staticPath);
+      fs.readFile(staticPath, (err, data) => {
+        if (err) { res.writeHead(404); res.end('Not found'); return; }
+        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+        res.end(data);
+      }); return;
+    }
+
+    // Discord bot showcase — a self-contained static Discord UI mockup (no backend).
+    // Mirrors the kanban/stacker blocks: 301 the bare path to the trailing-slash form,
+    // then serve files from public/discord/ with the shared MIME handling and 404s.
+    if (urlPath === '/discord') {
+      res.writeHead(301, { Location: '/discord/' });
+      res.end(); return;
+    }
+
+    if (urlPath.startsWith('/discord/')) {
+      const discordPath = urlPath.slice(9) || '/';
+      const staticPath = path.join(PUBLIC_DIR, '/discord', discordPath === '/' ? '/index.html' : discordPath);
       const ext = path.extname(staticPath);
       fs.readFile(staticPath, (err, data) => {
         if (err) { res.writeHead(404); res.end('Not found'); return; }
