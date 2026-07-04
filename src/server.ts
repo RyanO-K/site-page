@@ -328,6 +328,25 @@ const server = http.createServer(async (req, res) => {
       }); return;
     }
 
+    // Kanban showcase — a self-contained static page (no backend). Mirrors the
+    // stacker/snake blocks: 301 the bare path to the trailing-slash form, then
+    // serve files from public/kanban/ with the shared MIME handling and 404s.
+    if (urlPath === '/kanban') {
+      res.writeHead(301, { Location: '/kanban/' });
+      res.end(); return;
+    }
+
+    if (urlPath.startsWith('/kanban/')) {
+      const kanbanPath = urlPath.slice(8) || '/';
+      const staticPath = path.join(PUBLIC_DIR, '/kanban', kanbanPath === '/' ? '/index.html' : kanbanPath);
+      const ext = path.extname(staticPath);
+      fs.readFile(staticPath, (err, data) => {
+        if (err) { res.writeHead(404); res.end('Not found'); return; }
+        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+        res.end(data);
+      }); return;
+    }
+
     serveStatic(res, urlPath);
   } catch (err) {
     console.error(err);
