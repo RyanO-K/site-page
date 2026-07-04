@@ -12,6 +12,13 @@
   a card: pulsing dot, shimmer, and a comment that types itself out, then the card
   slides to Done and the next Ready card picks up. Designed to read well both full-size
   and inside the portfolio's ~360px non-scrolling <iframe> preview.
+
+  INTERACTIVE (ticket #20): the moment you click a card — or drag one between columns —
+  the scripted demo freezes and hands you the board, exactly like the /discord showcase.
+  A click opens the ticket's detail side panel (as the real board does); cards can be
+  dragged between To Do / Ready / In Progress / Done. A "Resume demo" banner restarts the
+  auto-play. In the tiny iframe preview the card sets pointer-events:none, so the preview
+  just keeps looping — interaction only kicks in when the page is opened full-size.
 -->
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,6 +38,7 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
+    display: flex; flex-direction: column; height: 100vh;
   }
 
   /* topbar — mirrors the real board's treatment (📋 Task Board + live status pill) */
@@ -60,7 +68,7 @@
      In-Progress agent stays visible in a narrow, non-scrolling iframe. */
   .board {
     display: flex; gap: 8px;
-    padding: 10px 12px; height: calc(100vh - 45px);
+    padding: 10px 12px; flex: 1 1 0; min-height: 0;
     align-items: stretch;
   }
   .column {
@@ -153,6 +161,72 @@
   .col-count.pop { animation: countPop var(--dur-fast) var(--ease-spring); }
   @keyframes countPop { 0% { transform: scale(1); } 45% { transform: scale(1.4); } 100% { transform: scale(1); } }
 
+  /* ── Interactive mode (ticket #20) ──────────────────────────────────────────
+     Clicking a card (or dragging one) stops the scripted demo and hands the board
+     to the visitor — cards become draggable between columns and open a detail
+     panel, mirroring the real board. A banner + Resume control restart auto-play. */
+  .card { cursor: pointer; }
+  .card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.4); }
+  .board.interactive .card { cursor: grab; }
+  .card.dragging { opacity: .4; cursor: grabbing; }
+  .col-body.drop-target { background: rgba(59,130,246,.10); outline: 1px dashed rgba(59,130,246,.55); outline-offset: -3px; border-radius: 6px; }
+
+  /* the status pill flips to a paused/amber state while you're driving the board */
+  .status-pill.paused { border-color: rgba(245,158,11,.5); color: #fcd34d; }
+  .status-pill.paused .dot { background: #f59e0b; animation: none; }
+
+  /* paused banner (mirrors the /discord showcase's "example inputs paused" banner) */
+  .paused-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 7px 14px; background: rgba(59,130,246,.12);
+    border-bottom: 1px solid var(--surface-alt); font-size: 12px; color: var(--text);
+  }
+  .paused-banner[hidden] { display: none; }
+  .paused-banner span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .resume-btn {
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  .resume-btn:hover { background: #2563eb; transform: translateY(-1px); }
+  .resume-btn:active { transform: scale(.96); }
+
+  /* ── detail side panel (the real board opens one on card click) ─────────────── */
+  .panel-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    opacity: 0; pointer-events: none; transition: opacity 220ms var(--ease-out); z-index: 40;
+  }
+  .panel-overlay.open { opacity: 1; pointer-events: auto; }
+  .panel {
+    position: fixed; top: 0; right: 0; height: 100%; width: min(380px, 88vw);
+    background: var(--surface); border-left: 1px solid var(--surface-alt);
+    box-shadow: -10px 0 28px rgba(0,0,0,.45);
+    transform: translateX(100%); transition: transform 240ms var(--ease-out);
+    z-index: 50; display: flex; flex-direction: column;
+  }
+  .panel.open { transform: none; }
+  .panel-head {
+    padding: 14px 16px; border-bottom: 1px solid var(--surface-alt);
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .panel-head h2 { font-size: 15px; font-weight: 700; line-height: 1.35; flex: 1; }
+  .panel-close {
+    background: var(--bg); color: var(--text-muted); border: 1px solid var(--surface-alt);
+    width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 13px; flex-shrink: 0;
+  }
+  .panel-close:hover { color: var(--text); background: var(--surface-alt); }
+  .panel-body { padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+  .panel-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .panel-label { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); font-weight: 700; margin-bottom: 5px; }
+  .panel-detail { font-size: 13px; line-height: 1.55; color: var(--text); }
+  .panel-comment {
+    background: var(--bg); border: 1px solid var(--surface-alt); border-radius: 6px;
+    padding: 9px 11px; font-size: 12px; line-height: 1.5; color: var(--text-muted);
+  }
+  .panel-comment .who { color: #93c5fd; font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px; }
+  .panel-tip { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   }
@@ -162,9 +236,38 @@
   <div class="topbar">
     <h1>📋 Task Board</h1>
     <span class="board-pick">ai-kanban</span>
-    <span class="status-pill"><span class="dot"></span>orchestrator · live</span>
+    <span class="status-pill" id="pill"><span class="dot"></span><span class="pill-txt">orchestrator · live</span></span>
+  </div>
+  <div class="paused-banner" id="pausedBanner" hidden>
+    <span>⏸ Demo paused — you're driving. Drag cards between columns, or click a card for details.</span>
+    <button class="resume-btn" id="resumeBtn" type="button">▶ Resume demo</button>
   </div>
   <div class="board" id="board"></div>
+
+  <!-- detail side panel (ticket #20): opens when a card is clicked, like the real board -->
+  <div class="panel-overlay" id="overlay"></div>
+  <aside class="panel" id="panel" aria-label="Ticket detail">
+    <div class="panel-head">
+      <h2 class="p-title"></h2>
+      <button class="panel-close" id="panelClose" type="button" aria-label="Close">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="panel-row">
+        <span class="card-id p-id"></span>
+        <span class="card-status-badge p-status"></span>
+        <span class="model-badge p-model"></span>
+      </div>
+      <div>
+        <div class="panel-label">Detail</div>
+        <p class="panel-detail p-detail"></p>
+      </div>
+      <div>
+        <div class="panel-label">Latest comment</div>
+        <div class="panel-comment p-comment"></div>
+      </div>
+      <p class="panel-tip">Drag cards between columns to move them, then hit <strong>Resume demo</strong> to hand the board back to the orchestrator.</p>
+    </div>
+  </aside>
 
 <script>
 (function () {
@@ -182,26 +285,36 @@
 
   // ── Ticket pool (cycles) — real ai-kanban / orchestrator flavour ────────────
   const POOL = [
-    { title: 'Idempotent kanban server startup',   model: 'sonnet', comment: 'Added a single-instance guard; port 8745 no longer wedges. 262 tests pass.' },
-    { title: 'FLIP slide animation for card moves', model: 'sonnet', comment: 'Transforms only touch the GPU; slides land at 180ms. Suite green.' },
-    { title: 'Enforce orchestrator concurrency cap', model: 'opus',  comment: 'Cap honoured in orchestrator_core; 3 agents max. Unit tests pass.' },
-    { title: 'Notification bell for blocked tickets', model: 'sonnet', comment: 'Badge hides at zero; blocked tickets now surface. 408 passing.' },
-    { title: 'Two-column board settings modal',      model: 'sonnet', comment: 'Implemented the two-column modal; all 416 tests pass.' },
-    { title: 'Performance tab CPU rollup',           model: 'haiku',  comment: 'Rolled up subprocess CPU over a 5-min window. psutil path ok.' },
-    { title: 'Docker dev-workspace image',           model: 'opus',   comment: 'node:20-slim + py3 + Claude CLI image builds clean. 407/410 in-container.' },
-    { title: 'Reduced-motion accessibility pass',    model: 'sonnet', comment: 'prefers-reduced-motion kills nonessential animation. Audit green.' },
+    { title: 'Idempotent kanban server startup',   model: 'sonnet', comment: 'Added a single-instance guard; port 8745 no longer wedges. 262 tests pass.',
+      detail: 'Duplicate server instances piled up and co-bound port 8745, wedging the API so boards failed to render. Startup now kills stale listeners before binding.' },
+    { title: 'FLIP slide animation for card moves', model: 'sonnet', comment: 'Transforms only touch the GPU; slides land at 180ms. Suite green.',
+      detail: 'Card moves jumped between columns. Reworked them as FLIP transitions so only transform/opacity animate — smooth and GPU-friendly.' },
+    { title: 'Enforce orchestrator concurrency cap', model: 'opus',  comment: 'Cap honoured in orchestrator_core; 3 agents max. Unit tests pass.',
+      detail: 'The headless loop could dispatch more sub-agents than the configured cap. Reap now runs before dispatch and stops once the in-flight count hits the limit.' },
+    { title: 'Notification bell for blocked tickets', model: 'sonnet', comment: 'Badge hides at zero; blocked tickets now surface. 408 passing.',
+      detail: 'Blocked tickets awaiting a human answer had no entry point. Added a topbar bell whose badge counts pending questions and hides at zero.' },
+    { title: 'Two-column board settings modal',      model: 'sonnet', comment: 'Implemented the two-column modal; all 416 tests pass.',
+      detail: 'The board-settings form was a tall single column. Split it into two columns to cut the modal height on smaller screens.' },
+    { title: 'Performance tab CPU rollup',           model: 'haiku',  comment: 'Rolled up subprocess CPU over a 5-min window. psutil path ok.',
+      detail: 'Rolled each Claude session’s subprocess-tree CPU/memory into a live 5-minute graph on the Performance tab, with a whole-tree kill button.' },
+    { title: 'Docker dev-workspace image',           model: 'opus',   comment: 'node:20-slim + py3 + Claude CLI image builds clean. 407/410 in-container.',
+      detail: 'Run each dispatched agent inside a per-repo container. Built a node:20-slim + Python image with the Claude CLI and pytest; secrets pass through by name.' },
+    { title: 'Reduced-motion accessibility pass',    model: 'sonnet', comment: 'prefers-reduced-motion kills nonessential animation. Audit green.',
+      detail: 'Honoured prefers-reduced-motion across the board UI so nonessential animation is disabled for visitors who ask for it.' },
   ];
 
   // ── State ───────────────────────────────────────────────────────────────────
-  const cards = {};                                   // id -> {id, title, model, comment, done}
+  const cards = {};                                   // id -> {id, title, model, comment, detail, done, working}
   const state = { todo: [], ready: [], inprogress: [], done: [] };
   const els = new Map();                               // id -> card element
   let nextId = 1, poolAt = 0;
+  // interactive-mode flags (ticket #20)
+  let paused = false, interactive = false, dragId = null, panelId = null, _resume = null;
 
   function mint(seed) {
     const t = seed || POOL[poolAt++ % POOL.length];
     const id = nextId++;
-    cards[id] = { id, title: t.title, model: t.model, comment: t.comment, done: false };
+    cards[id] = { id, title: t.title, model: t.model, comment: t.comment, detail: t.detail, done: false };
     return id;
   }
 
@@ -226,6 +339,18 @@
     hdr.append(c.label + ' ', count);
     const body = document.createElement('div');
     body.className = 'col-body';
+    // drop target for card drags (ticket #20)
+    body.addEventListener('dragover', e => {
+      if (dragId == null) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      body.classList.add('drop-target');
+    });
+    body.addEventListener('dragleave', e => { if (!body.contains(e.relatedTarget)) body.classList.remove('drop-target'); });
+    body.addEventListener('drop', e => {
+      e.preventDefault(); body.classList.remove('drop-target');
+      if (dragId != null) moveCard(dragId, c.key);
+    });
     col.append(hdr, body);
     board.appendChild(col);
     bodies[c.key] = body;
@@ -253,6 +378,19 @@
     el.querySelector('.am').textContent = c.model;
     if (c.done) el.querySelector('.card-comment').textContent = c.comment; // pre-typed seed
     el.addEventListener('animationend', e => { if (e.animationName === 'cardEnter') el.classList.remove('card-enter'); });
+    // ── interaction (ticket #20): click opens the detail panel; drag moves the card ──
+    el.draggable = true;
+    el.addEventListener('click', () => { enterInteractive(); openPanel(id); });
+    el.addEventListener('dragstart', e => {
+      enterInteractive();
+      dragId = id;
+      el.classList.add('dragging');
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(id)); } catch (_) {} }
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging'); dragId = null;
+      document.querySelectorAll('.col-body.drop-target').forEach(b => b.classList.remove('drop-target'));
+    });
     els.set(id, el);
     return el;
   }
@@ -311,14 +449,89 @@
     el.addEventListener('animationend', () => el.remove(), { once: true });
   }
 
-  // ── Demo clock ───────────────────────────────────────────────────────────────
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  // ── Demo clock — pausable so a click/drag can freeze the demo (ticket #20) ──────
+  const _timers = new Set();
+  function sleep(ms) {
+    return new Promise(resolve => {
+      const rec = {};
+      const t = setTimeout(() => { _timers.delete(rec); resolve(); }, ms);
+      rec.cancel = () => { clearTimeout(t); _timers.delete(rec); resolve(); };
+      _timers.add(rec);
+    });
+  }
+  function cancelTimers() { _timers.forEach(r => r.cancel()); }
+  const untilResumed = () => new Promise(r => { _resume = r; });
+
+  // ── Interactive mode: a click/drag stops the demo and hands over the board ───────
+  const pill = document.getElementById('pill');
+  const pausedBanner = document.getElementById('pausedBanner');
+  const overlay = document.getElementById('overlay');
+  const panel = document.getElementById('panel');
+
+  function enterInteractive() {
+    if (interactive) return;
+    interactive = true;
+    paused = true;
+    cancelTimers();                 // unstick the in-flight sleep so run() parks promptly
+    board.classList.add('interactive');
+    pausedBanner.hidden = false;
+    pill.classList.add('paused');
+    pill.querySelector('.pill-txt').textContent = "paused · you're driving";
+  }
+  function resumeDemo() {
+    if (!interactive) return;
+    interactive = false;
+    board.classList.remove('interactive');
+    pausedBanner.hidden = true;
+    pill.classList.remove('paused');
+    pill.querySelector('.pill-txt').textContent = 'orchestrator · live';
+    closePanel();
+    paused = false;
+    if (_resume) { const r = _resume; _resume = null; r(); } // wake the parked demo loop
+  }
+
+  // Move a card to another column (drag-drop), keeping the FLIP slide + counts in sync.
+  function moveCard(id, targetKey) {
+    if (!cards[id]) return;
+    const fromKey = colOf(id);
+    if (fromKey === targetKey) return;
+    const first = firstRects();
+    state[fromKey] = state[fromKey].filter(x => x !== id);
+    if (targetKey === 'done') state.done.unshift(id); else state[targetKey].push(id);
+    cards[id].working = false;
+    cards[id].done = (targetKey === 'done');
+    render(first);
+    if (panelId === id) fillPanel(id); // keep an open panel's status in sync
+  }
+
+  // ── detail side panel ───────────────────────────────────────────────────────────
+  function openPanel(id) { panelId = id; fillPanel(id); overlay.classList.add('open'); panel.classList.add('open'); }
+  function closePanel() { panelId = null; overlay.classList.remove('open'); panel.classList.remove('open'); }
+  function fillPanel(id) {
+    const c = cards[id], key = colOf(id);
+    panel.querySelector('.p-title').textContent = c.title;
+    panel.querySelector('.p-id').textContent = '#' + id;
+    panel.querySelector('.p-status').textContent = STATUS[key];
+    const mb = panel.querySelector('.p-model');
+    mb.className = 'model-badge p-model ' + c.model;
+    mb.textContent = c.model;
+    panel.querySelector('.p-detail').textContent = c.detail ||
+      'A ticket on the ai-kanban board. The headless orchestrator triages it, then dispatches a Claude sub-agent to work it end-to-end.';
+    const cm = panel.querySelector('.p-comment');
+    if (c.comment) {
+      cm.innerHTML = '<span class="who">🤖 ' + c.model + '</span>';
+      cm.append(document.createTextNode(c.comment));
+    } else {
+      cm.textContent = 'No comments yet — the agent hasn’t started this ticket.';
+    }
+  }
 
   async function typeComment(id) {
     const el = els.get(id).querySelector('.card-comment');
     const text = cards[id].comment;
     el.textContent = '';
     for (let i = 0; i < text.length; i++) {
+      if (paused) { el.textContent = text; return; } // fill instantly when the demo is frozen
       el.textContent += text[i];
       await sleep(24);
     }
@@ -343,15 +556,37 @@
     await sleep(1200);
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      if (paused) { await untilResumed(); continue; }
+      if (!state.inprogress.length) {          // a manual drag may have emptied In Progress
+        const first = firstRects();
+        if (state.ready.length) state.inprogress.push(state.ready.shift());
+        else if (state.todo.length) state.inprogress.push(state.todo.shift());
+        else state.inprogress.push(mint());
+        render(first);
+        await sleep(700);
+        continue;
+      }
       const id = state.inprogress[0];
       cards[id].working = true;
       paint(id);
       await typeComment(id);
+      if (paused) continue;
       await sleep(1100);
+      if (paused) continue;
       advance(id);
       await sleep(1700); // let the slide settle before the next agent starts
     }
   }
+
+  // ── wiring (ticket #20) ─────────────────────────────────────────────────────────
+  document.getElementById('resumeBtn').addEventListener('click', resumeDemo);
+  document.getElementById('panelClose').addEventListener('click', closePanel);
+  overlay.addEventListener('click', closePanel);
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (panelId != null) closePanel();
+    else if (interactive) resumeDemo();
+  });
 
   run();
 })();
