@@ -7,6 +7,7 @@ const LANG_COLORS = {
 let currentUser = null;
 
 async function init() {
+  setupNav();
   const me = await apiFetch('/api/me');
   currentUser = me.user;
   renderAuth();
@@ -16,6 +17,24 @@ async function init() {
     setupAdminPanel();
     setupAboutEdit();
   }
+}
+
+/** Wire the mobile hamburger toggle; collapses the menu after a nav choice. */
+function setupNav() {
+  const toggle = document.getElementById('nav-toggle');
+  const links = document.getElementById('nav-links');
+  if (!toggle || !links) return;
+  const close = () => {
+    links.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+  };
+  toggle.addEventListener('click', () => {
+    const open = links.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+  links.addEventListener('click', e => {
+    if (e.target.closest('a, #auth-item button')) close();
+  });
 }
 
 function renderAuth() {
