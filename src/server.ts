@@ -347,6 +347,25 @@ const server = http.createServer(async (req, res) => {
       }); return;
     }
 
+    // Discord bot showcase — a self-contained static Discord UI mockup (no backend).
+    // Mirrors the kanban/stacker blocks: 301 the bare path to the trailing-slash form,
+    // then serve files from public/discord/ with the shared MIME handling and 404s.
+    if (urlPath === '/discord') {
+      res.writeHead(301, { Location: '/discord/' });
+      res.end(); return;
+    }
+
+    if (urlPath.startsWith('/discord/')) {
+      const discordPath = urlPath.slice(9) || '/';
+      const staticPath = path.join(PUBLIC_DIR, '/discord', discordPath === '/' ? '/index.html' : discordPath);
+      const ext = path.extname(staticPath);
+      fs.readFile(staticPath, (err, data) => {
+        if (err) { res.writeHead(404); res.end('Not found'); return; }
+        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
+        res.end(data);
+      }); return;
+    }
+
     serveStatic(res, urlPath);
   } catch (err) {
     console.error(err);
