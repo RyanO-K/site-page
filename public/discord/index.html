@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Discord Kanban Bot — Discord mirror demo</title>
+<!--
+  Self-contained, no-network mockup of the discord-kanban-bot in action. The bot
+  (Python / discord.py, sibling repo discord-kanban-bot) mirrors .kanban boards into
+  Discord: ONE channel per board (named from the board slug), ONE thread per ticket,
+  opened with a starter embed rendering the ticket title/status/detail and a status
+  Select dropdown. Board comments mirror in as messages (board -> Discord); a human
+  message typed in a thread is written back to the board (Discord -> board). Slash
+  commands (/ticket /move /answer /status /orchestrator /kill) drive the board, and an
+  #orchestrator feed posts blocked-agent questions with Approve/Answer buttons + a modal.
+  Everything below is a faithful, hard-coded recreation of that UI in Discord's dark
+  theme. Composed to read well full-size AND inside the portfolio's ~360px non-scrolling
+  <iframe> preview (a media query collapses the rails so the thread + starter embed fill
+  the small viewport). No external requests; a little JS opens the dropdown and filters
+  the slash palette.
+-->
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --rail: #1e1f22;
+    --sidebar: #2b2d31;
+    --main: #313338;
+    --embed: #2b2d31;
+    --input: #383a40;
+    --hover: #35373c;
+    --text: #dbdee1;
+    --header: #f2f3f5;
+    --muted: #949ba4;
+    --faint: #80848e;
+    --blurple: #5865f2;
+    --green: #23a55a;
+    --red: #f23f43;
+    --amber: #f0b132;
+    --divider: #3f4147;
+    /* kanban status accents used on the embed's colored left border */
+    --st-inprogress: #5865f2;
+    --st-blocked: #f23f43;
+    --st-completed: #23a55a;
+    --st-ready: #3ba55d;
+    --st-todo: #949ba4;
+  }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: "gg sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--main);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.375;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app { display: flex; height: 100vh; }
+
+  /* ── server rail ─────────────────────────────────────────── */
+  .rail {
+    flex: 0 0 72px; background: var(--rail);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 0; gap: 8px; overflow: hidden;
+  }
+  .guild {
+    width: 48px; height: 48px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px; color: #fff; cursor: pointer;
+    transition: border-radius .15s ease, background .15s ease;
+  }
+  .guild.active { border-radius: 16px; background: var(--blurple); position: relative; }
+  .guild.active::before {
+    content: ""; position: absolute; left: -16px; top: 50%; transform: translateY(-50%);
+    width: 4px; height: 40px; border-radius: 0 4px 4px 0; background: #fff;
+  }
+  .guild.home { background: var(--blurple); border-radius: 16px; }
+  .guild.plain { background: #313338; color: var(--green); font-size: 22px; }
+  .guild:hover { border-radius: 14px; }
+  .rail-sep { width: 32px; height: 2px; border-radius: 1px; background: #35363c; }
+
+  /* ── channel sidebar ─────────────────────────────────────── */
+  .sidebar {
+    flex: 0 0 232px; background: var(--sidebar);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .server-head {
+    height: 48px; flex: 0 0 48px; padding: 0 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-weight: 600; font-size: 15px; color: var(--header);
+    box-shadow: 0 1px 0 rgba(0,0,0,.2); cursor: pointer;
+  }
+  .server-head .chev { color: var(--muted); font-size: 12px; }
+  .channels { padding: 12px 8px; overflow-y: auto; }
+  .cat {
+    display: flex; align-items: center; gap: 4px;
+    padding: 16px 8px 4px; font-size: 11px; font-weight: 700;
+    letter-spacing: .02em; text-transform: uppercase; color: var(--muted);
+  }
+  .cat:first-child { padding-top: 4px; }
+  .chan {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 8px; margin: 1px 0; border-radius: 4px;
+    color: var(--muted); font-size: 15px; font-weight: 500; cursor: pointer;
+    white-space: nowrap; overflow: hidden;
+  }
+  .chan .hash { color: var(--faint); font-size: 18px; font-weight: 400; }
+  .chan:hover { background: var(--hover); color: var(--text); }
+  .chan.active { background: #404249; color: var(--header); }
+  .chan.active .hash { color: var(--muted); }
+  .chan .name { overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── main column ─────────────────────────────────────────── */
+  .main { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; background: var(--main); }
+  .chan-header {
+    height: 48px; flex: 0 0 48px; padding: 0 16px; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,.2), 0 1.5px 0 rgba(0,0,0,.05); z-index: 2;
+  }
+  .chan-header .hash { color: var(--faint); font-size: 22px; }
+  .chan-header .title { font-weight: 700; color: var(--header); font-size: 16px; }
+  .chan-header .sep { width: 1px; height: 24px; background: var(--divider); margin: 0 4px; }
+  .chan-header .topic { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thread-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #2b2d31; color: var(--text); font-size: 13px; font-weight: 600;
+    padding: 3px 10px; border-radius: 6px;
+  }
+
+  .messages { flex: 1 1 0; overflow-y: auto; padding: 16px 0 4px; }
+  .messages::-webkit-scrollbar { width: 8px; }
+  .messages::-webkit-scrollbar-thumb { background: #1a1b1e; border-radius: 4px; }
+
+  /* system "start of thread" banner */
+  .thread-start {
+    padding: 8px 20px 4px; color: var(--muted); font-size: 13px;
+  }
+  .thread-start b { color: var(--header); }
+
+  /* a message row */
+  .msg { display: flex; gap: 16px; padding: 4px 20px; }
+  .msg:hover { background: #2e3035; }
+  .avatar {
+    flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 15px; color: #fff; margin-top: 2px;
+  }
+  .msg-body { flex: 1 1 0; min-width: 0; }
+  .msg-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .author { font-weight: 600; color: var(--header); font-size: 15px; }
+  .author.bot-color { color: #c8a2ff; }
+  .app-tag {
+    background: var(--blurple); color: #fff; font-size: 10px; font-weight: 600;
+    padding: 1px 5px; border-radius: 4px; text-transform: uppercase; letter-spacing: .02em;
+    display: inline-flex; align-items: center; gap: 3px; position: relative; top: -1px;
+  }
+  .ts { color: var(--faint); font-size: 12px; }
+  .writeback {
+    color: var(--green); font-size: 12px; font-weight: 600;
+  }
+  .text { color: var(--text); margin-top: 2px; }
+  .text code {
+    background: #2b2d31; border-radius: 4px; padding: 1px 4px;
+    font-family: Consolas, "Courier New", monospace; font-size: 13px;
+  }
+
+  /* ── starter embed ───────────────────────────────────────── */
+  .embed {
+    max-width: 520px; margin-top: 6px;
+    background: var(--embed); border-radius: 4px;
+    border-left: 4px solid var(--st-inprogress);
+    padding: 12px 16px 14px;
+  }
+  .embed.blocked { border-left-color: var(--st-blocked); }
+  .embed.status { border-left-color: var(--blurple); }
+  .embed-author { color: var(--muted); font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .embed-title { color: var(--header); font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+  .embed-desc { color: #d0d3d9; font-size: 14px; white-space: pre-line; }
+  .embed-fields { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 10px; }
+  .field-name { color: var(--header); font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+  .field-val { color: var(--text); font-size: 14px; }
+  .status-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+    background: rgba(88,101,242,.16); color: #b6bdff;
+  }
+  .status-chip .sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--st-inprogress); }
+  .status-chip.blocked { background: rgba(242,63,67,.16); color: #ffb0b2; }
+  .status-chip.blocked .sdot { background: var(--st-blocked); }
+
+  /* action row: select + buttons (Discord components live UNDER the message/embed) */
+  .action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; max-width: 520px; }
+  .select {
+    position: relative; flex: 1 1 240px; min-width: 200px; max-width: 400px;
+    background: var(--input); border: 1px solid #1e1f22; border-radius: 4px;
+    padding: 9px 12px; color: var(--text); font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    user-select: none;
+  }
+  .select .placeholder { color: var(--text); display: inline-flex; align-items: center; gap: 8px; }
+  .select .chev { color: var(--muted); transition: transform .15s ease; }
+  .select.open .chev { transform: rotate(180deg); }
+  .select-menu {
+    display: none; position: absolute; left: 0; right: 0; bottom: calc(100% + 4px);
+    background: var(--input); border: 1px solid #1e1f22; border-radius: 4px;
+    padding: 4px; z-index: 20; box-shadow: 0 8px 16px rgba(0,0,0,.24);
+  }
+  .select.open .select-menu { display: block; }
+  .opt {
+    display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 3px;
+    color: var(--text); font-size: 14px; cursor: pointer;
+  }
+  .opt:hover { background: var(--blurple); color: #fff; }
+  .opt .sdot { width: 8px; height: 8px; border-radius: 50%; }
+  .opt.cur { background: rgba(255,255,255,.04); }
+
+  .btn {
+    border: none; border-radius: 4px; padding: 8px 16px;
+    font-size: 14px; font-weight: 600; color: #fff; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn.success { background: var(--green); }
+  .btn.primary { background: var(--blurple); }
+  .btn.secondary { background: #4e5058; }
+  .btn:hover { filter: brightness(1.08); }
+
+  /* channel-context divider (marks a switch to the #orchestrator feed for the mockup) */
+  .ctx-divider {
+    display: flex; align-items: center; gap: 10px; margin: 18px 20px 6px;
+    color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .ctx-divider::before, .ctx-divider::after { content: ""; flex: 1; height: 1px; background: var(--divider); }
+  .ctx-divider .hash { color: var(--faint); }
+
+  /* typing indicator */
+  .typing { display: flex; align-items: center; gap: 8px; padding: 2px 20px 8px; color: var(--muted); font-size: 13px; }
+  .typing .dots { display: inline-flex; gap: 3px; }
+  .typing .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: bounce 1.2s infinite ease-in-out; }
+  .typing .dots i:nth-child(2) { animation-delay: .18s; }
+  .typing .dots i:nth-child(3) { animation-delay: .36s; }
+  @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+  /* ── composer + slash palette ────────────────────────────── */
+  .composer { padding: 0 16px 22px; position: relative; }
+  .slash-palette {
+    position: absolute; left: 16px; right: 16px; bottom: calc(100% - 4px);
+    background: #2b2d31; border-radius: 8px; overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0,0,0,.3); border: 1px solid #1e1f22;
+  }
+  .palette-head { padding: 10px 14px 8px; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+  .palette-list { max-height: 260px; overflow-y: auto; padding-bottom: 6px; }
+  .cmd {
+    display: flex; align-items: center; gap: 12px; padding: 9px 14px; cursor: pointer;
+  }
+  .cmd.hidden { display: none; }
+  .cmd:hover, .cmd.sel { background: #383a40; }
+  .cmd .app-badge {
+    flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--blurple); color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .cmd .cmd-name { color: var(--header); font-weight: 600; }
+  .cmd .cmd-name b { color: var(--header); }
+  .cmd .cmd-desc { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cmd .cmd-main { min-width: 0; display: flex; flex-direction: column; }
+
+  .input-bar {
+    background: var(--input); border-radius: 8px; padding: 11px 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .input-bar .plus {
+    flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: var(--muted); color: var(--input);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px;
+  }
+  .input-bar .slash { color: var(--blurple); font-weight: 700; }
+  .input-bar .field { flex: 1 1 0; color: var(--text); outline: none; }
+  .input-bar .caret { width: 1px; height: 18px; background: var(--text); animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── iframe / narrow composition ─────────────────────────────
+     In the ~360px project-card preview, collapse the server rail and hide the
+     channel sidebar so the OPEN THREAD + starter embed fill the small viewport. */
+  @media (max-width: 640px) {
+    .rail { flex-basis: 54px; }
+    .guild { width: 40px; height: 40px; border-radius: 13px; font-size: 15px; }
+    .sidebar { display: none; }
+    .chan-header .topic, .chan-header .sep { display: none; }
+    .msg { padding-left: 14px; padding-right: 14px; gap: 12px; }
+    .avatar { flex-basis: 34px; width: 34px; height: 34px; font-size: 13px; }
+    .embed, .action-row { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- server rail: guild icon + Discord home/add -->
+  <nav class="rail" aria-label="Servers">
+    <div class="guild home" title="Direct Messages">🎮</div>
+    <div class="rail-sep"></div>
+    <div class="guild active" title="Kanban Mirror" style="background:#3b3f8f">KM</div>
+    <div class="guild plain" title="Add a server">+</div>
+  </nav>
+
+  <!-- channel sidebar: one text channel per board + the #orchestrator feed -->
+  <aside class="sidebar">
+    <div class="server-head">Kanban Mirror <span class="chev">▾</span></div>
+    <div class="channels">
+      <div class="cat">▾ Boards</div>
+      <div class="chan"><span class="hash">#</span><span class="name">ai-kanban</span></div>
+      <div class="chan active"><span class="hash">#</span><span class="name">discord-kanban-bot</span></div>
+      <div class="chan"><span class="hash">#</span><span class="name">site-page</span></div>
+      <div class="cat">▾ Orchestrator</div>
+      <div class="chan"><span class="hash">#</span><span class="name">orchestrator</span></div>
+    </div>
+  </aside>
+
+  <!-- main: the #discord-kanban-bot channel with an open ticket thread -->
+  <section class="main">
+    <header class="chan-header">
+      <span class="hash">#</span>
+      <span class="title">discord-kanban-bot</span>
+      <span class="sep"></span>
+      <span class="thread-pill">🧵 Two-way comment sync (Discord ↔ board)</span>
+      <span class="topic" style="margin-left:8px">Thread · one per ticket</span>
+    </header>
+
+    <div class="messages" id="messages">
+      <div class="thread-start">
+        <b>#12 · Two-way comment sync (Discord ↔ board)</b> — thread opened by <b>Kanban Mirror</b>.
+        The bot posts a starter embed for the ticket, then mirrors its comments below.
+      </div>
+
+      <!-- STARTER EMBED: title, status accent, detail, + status Select dropdown -->
+      <div class="msg">
+        <div class="avatar" style="background:#5865f2">KM</div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="author bot-color">Kanban Mirror</span>
+            <span class="app-tag">✔ App</span>
+            <span class="ts">Today at 9:14 AM</span>
+          </div>
+          <div class="embed">
+            <div class="embed-author">discord-kanban-bot · ticket #12</div>
+            <div class="embed-title">Two-way comment sync (Discord ↔ board)</div>
+            <div class="embed-desc">A message typed in a ticket's thread is written back to the board as a comment via <code>POST /api/board/&lt;slug&gt;/task/&lt;id&gt;/comment</code>. Echo avoidance bumps the ticket's <code>syncedComments</code> high-water mark in the same lock so the next poll never re-posts it.</div>
+            <div class="embed-fields">
+              <div>
+                <div class="field-name">Status</div>
+                <div class="field-val"><span class="status-chip"><span class="sdot"></span>In&nbsp;Progress</span></div>
+              </div>
+              <div>
+                <div class="field-name">Board</div>
+                <div class="field-val"># discord-kanban-bot</div>
+              </div>
+            </div>
+          </div>
+          <!-- Discord component: the status Select the real bot attaches to the starter embed -->
+          <div class="action-row">
+            <div class="select" id="statusSelect" role="button" tabindex="0" aria-label="Move status">
+              <span class="placeholder"><span class="sdot" style="width:8px;height:8px;border-radius:50%;background:var(--st-inprogress);display:inline-block"></span>Move status — In&nbsp;Progress</span>
+              <span class="chev">▾</span>
+              <div class="select-menu">
+                <div class="opt"><span class="sdot" style="background:var(--st-todo)"></span>Todo</div>
+                <div class="opt"><span class="sdot" style="background:var(--st-ready)"></span>Ready</div>
+                <div class="opt cur"><span class="sdot" style="background:var(--st-inprogress)"></span>In Progress ✓</div>
+                <div class="opt"><span class="sdot" style="background:var(--st-blocked)"></span>Blocked</div>
+                <div class="opt"><span class="sdot" style="background:var(--st-completed)"></span>Completed</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MIRRORED COMMENT (board -> Discord): an agent comment from the board -->
+      <div class="msg">
+        <div class="avatar" style="background:#5865f2">KM</div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="author bot-color">Kanban Mirror</span>
+            <span class="app-tag">✔ App</span>
+            <span class="ts">Today at 9:15 AM</span>
+          </div>
+          <div class="text"><b style="color:var(--header)">Claude</b> · Wired <code>on_message</code> → <code>add_comment</code> and advanced the watermark in the same <code>_state_lock</code> hold. Added a regression test that a Discord-authored comment isn't echoed on the next poll.</div>
+        </div>
+      </div>
+
+      <!-- TWO-WAY: a human message typed IN Discord, written back to the board -->
+      <div class="msg">
+        <div class="avatar" style="background:#3ba55d">R</div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="author">ryan</span>
+            <span class="ts">Today at 9:16 AM</span>
+            <span class="writeback">↩ written to board as a comment</span>
+          </div>
+          <div class="text">Nice — confirmed no echo after the write-back. Let's mark it done once the feed test lands.</div>
+        </div>
+      </div>
+
+      <!-- /status EMBED example (board / orchestrator summary) -->
+      <div class="msg">
+        <div class="avatar" style="background:#5865f2">KM</div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="author bot-color">Kanban Mirror</span>
+            <span class="app-tag">✔ App</span>
+            <span class="ts">Today at 9:17 AM</span>
+            <span class="ts">· <code style="background:#2b2d31;padding:1px 4px;border-radius:4px">/status</code></span>
+          </div>
+          <div class="embed status">
+            <div class="embed-author">Orchestrator status</div>
+            <div class="embed-title">3 boards · 2 agents in flight</div>
+            <div class="embed-fields">
+              <div><div class="field-name">Orchestrator</div><div class="field-val">🟢 Enabled</div></div>
+              <div><div class="field-name">Concurrency</div><div class="field-val">2 / 3</div></div>
+              <div><div class="field-name">In&nbsp;flight</div><div class="field-val">#12 discord-kanban-bot<br>#7 ai-kanban</div></div>
+              <div><div class="field-name">Blocked</div><div class="field-val">1 question waiting</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- slash command being composed → typing indicator -->
+      <div class="typing">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span><b style="color:var(--header)">ryan</b> is typing a command…</span>
+      </div>
+
+      <!-- CONTEXT SWITCH to the #orchestrator feed for the mockup -->
+      <div class="ctx-divider"><span class="hash">#</span> orchestrator · activity feed</div>
+
+      <!-- BLOCKED-QUESTION feed post with Approve / Answer buttons (+ modal) -->
+      <div class="msg">
+        <div class="avatar" style="background:#5865f2">KM</div>
+        <div class="msg-body">
+          <div class="msg-head">
+            <span class="author bot-color">Kanban Mirror</span>
+            <span class="app-tag">✔ App</span>
+            <span class="ts">Today at 9:18 AM</span>
+          </div>
+          <div class="embed blocked">
+            <div class="embed-author">⛔ Blocked — needs a human</div>
+            <div class="embed-title">#9 site-page · Custom domain blueprint</div>
+            <div class="embed-desc">Agent is blocked and asked:
+<b style="color:var(--header)">"Point okeefe.work at Render or keep it on Railway? I can write either blueprint."</b></div>
+            <div class="embed-fields">
+              <div><div class="field-name">Type</div><div class="field-val">choice · single</div></div>
+              <div><div class="field-name">Options</div><div class="field-val">Render · Railway</div></div>
+            </div>
+          </div>
+          <div class="action-row">
+            <button class="btn success">✓ Approve</button>
+            <button class="btn primary" id="answerBtn">✎ Answer…</button>
+            <button class="btn secondary">Snooze</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- composer with the "/" command palette open (real bot's slash commands) -->
+    <div class="composer">
+      <div class="slash-palette" id="palette">
+        <div class="palette-head">Commands matching <code style="color:var(--header)">/</code> — Kanban Mirror</div>
+        <div class="palette-list" id="paletteList">
+          <div class="cmd sel" data-cmd="ticket">
+            <div class="app-badge">KM</div>
+            <div class="cmd-main"><div class="cmd-name"><b>/ticket</b></div><div class="cmd-desc">Create a board ticket (title, detail, status, depends_on…)</div></div>
+          </div>
+          <div class="cmd" data-cmd="move">
+            <div class="app-badge">KM</div>
+            <div class="cmd-main"><div class="cmd-name"><b>/move</b></div><div class="cmd-desc">Move a ticket's status column</div></div>
+          </div>
+          <div class="cmd" data-cmd="answer">
+            <div class="app-badge">KM</div>
+            <div class="cmd-main"><div class="cmd-name"><b>/answer</b></div><div class="cmd-desc">Answer a blocked agent's question</div></div>
+          </div>
+          <div class="cmd" data-cmd="status">
+            <div class="app-badge">KM</div>
+            <div class="cmd-main"><div class="cmd-name"><b>/status</b></div><div class="cmd-desc">Board + orchestrator summary embed</div></div>
+          </div>
+          <div class="cmd" data-cmd="orchestrator">
+            <div class="app-badge">KM</div>
+            <div class="cmd-main"><div class="cmd-name"><b>/orchestrator</b></div><div class="cmd-desc">Enable / disable / configure the orchestrator</div></div>
+          </div>
+          <div class="cmd" data-cmd="kill">
+            <div class="app-badge">KM</div>
+            <div class="cmd-main"><div class="cmd-name"><b>/kill</b></div><div class="cmd-desc">Stop an in-flight agent (or stop all)</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="input-bar">
+        <span class="plus">+</span>
+        <span class="slash">/</span>
+        <span class="field" id="cmdField"></span>
+        <span class="caret"></span>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  // Status Select dropdown — click to open/close (Discord component behavior).
+  const sel = document.getElementById('statusSelect');
+  sel.addEventListener('click', () => sel.classList.toggle('open'));
+  document.addEventListener('click', (e) => { if (!sel.contains(e.target)) sel.classList.remove('open'); });
+
+  // Slash palette filters as the "typed" command grows — a small tasteful touch.
+  const list = document.getElementById('paletteList');
+  const field = document.getElementById('cmdField');
+  const cmds = [...list.querySelectorAll('.cmd')];
+  const order = ['ticket', 'move', 'answer', 'status', 'orchestrator', 'kill'];
+  let typed = '';
+
+  function render() {
+    let first = true;
+    cmds.forEach(c => {
+      const match = c.dataset.cmd.startsWith(typed);
+      c.classList.toggle('hidden', !match);
+      c.classList.toggle('sel', match && first);
+      if (match && first) first = false;
+    });
+    field.textContent = typed;
+  }
+
+  // Loop: type out "/status", pause on it, clear, and start again — shows the
+  // palette filtering live without any network or heavy animation.
+  let i = 0, target = 'status', mode = 'type';
+  function tick() {
+    if (mode === 'type') {
+      typed = target.slice(0, ++i);
+      if (i >= target.length) { mode = 'hold'; setTimeout(tick, 1600); render(); return; }
+    } else if (mode === 'hold') {
+      mode = 'clear';
+    } else {
+      typed = target.slice(0, --i);
+      if (i <= 0) { mode = 'type'; }
+    }
+    render();
+    setTimeout(tick, mode === 'clear' ? 90 : 150);
+  }
+  render();
+  setTimeout(tick, 1200);
+</script>
+</body>
+</html>
