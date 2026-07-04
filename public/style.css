@@ -53,6 +53,31 @@ body {
   font-size: 1rem;
   letter-spacing: .02em;
   color: var(--accent);
+  white-space: nowrap;
+}
+
+/* Hamburger toggle — hidden on desktop, revealed under the breakpoint. */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nav-toggle-bar {
+  width: 20px;
+  height: 2px;
+  margin: 0 auto;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform .2s, opacity .2s;
 }
 
 .nav-links {
@@ -405,3 +430,52 @@ a:hover { text-decoration: underline; }
 
 .site-footer a { color: var(--muted); }
 .site-footer a:hover { color: var(--text); text-decoration: none; }
+
+/* ── Responsive ──────────────────────────────────── */
+/* Tablet & phone: collapse the nav into a hamburger drawer and
+   trim the heavy desktop padding so nothing overflows narrow widths. */
+@media (max-width: 768px) {
+  .nav { padding: 0 1.25rem; }
+  .nav-toggle { display: flex; }
+
+  .nav-links {
+    position: absolute;
+    top: var(--nav-h);
+    left: 0;
+    right: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: .5rem 1.25rem 1rem;
+    background: rgba(13,13,13,.97);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-links.open { display: flex; }
+
+  .nav-links a {
+    display: block;
+    padding: .65rem 0;
+    font-size: 1rem;
+  }
+
+  #auth-item { margin-top: .5rem; }
+  #auth-item a, #auth-item button { display: inline-block; font-size: .9rem; }
+
+  /* Morph the bars into an X while the drawer is open. */
+  .nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(2) { opacity: 0; }
+  .nav-toggle[aria-expanded="true"] .nav-toggle-bar:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  .hero { padding: 0 1.25rem; }
+  .section { padding: 3.5rem 1.25rem; }
+  .project-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .section { padding: 3rem 1.25rem; }
+  h2 { font-size: 1.5rem; }
+  .hero-sub { margin-top: .75rem; }
+}
