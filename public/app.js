@@ -165,15 +165,74 @@ function setupAdminPanel() {
   });
 }
 
+// Number of projects to feature up top with rich preview cards; the rest fall
+// into the compact gallery below.
+const FEATURED_COUNT = 3;
+
 async function loadProjects() {
   const grid = document.getElementById('project-grid');
+  const galleryWrap = document.getElementById('gallery-wrap');
+  const gallery = document.getElementById('project-gallery');
   const projects = await apiFetch('/api/projects');
   grid.innerHTML = '';
+  gallery.innerHTML = '';
+  galleryWrap.hidden = true;
   if (!projects.length) {
     grid.innerHTML = '<p class="empty-state">No projects yet.</p>';
     return;
   }
-  for (const p of projects) grid.appendChild(buildCard(p));
+
+  const featured = projects.slice(0, FEATURED_COUNT);
+  const rest = projects.slice(FEATURED_COUNT);
+  for (const p of featured) grid.appendChild(buildCard(p));
+  if (rest.length) {
+    for (const p of rest) gallery.appendChild(buildGalleryCard(p));
+    galleryWrap.hidden = false;
+  }
+}
+
+/** A delete button for admins; shared by both card styles. */
+function buildDeleteBtn(p) {
+  const del = document.createElement('button');
+  del.className = 'delete-btn';
+  del.title = 'Remove';
+  del.textContent = '×';
+  del.addEventListener('click', async e => {
+    e.stopPropagation();
+    if (!confirm(`Remove "${p.name}"?`)) return;
+    await apiFetch(`/api/projects/${p.id}`, { method: 'DELETE' });
+    await loadProjects();
+  });
+  return del;
+}
+
+/** Compact card for the "More projects" gallery — no preview iframe, so the
+ *  featured three stay the visual focus while everything remains visible. */
+function buildGalleryCard(p) {
+  const card = document.createElement('div');
+  card.className = 'gallery-card';
+  card.dataset.id = p.id;
+  card.addEventListener('click', () => window.open(p.url, '_blank'));
+
+  const langColor = LANG_COLORS[p.language] ?? '#888';
+  const langBadge = p.language
+    ? `<span class="lang-dot" style="background:${langColor}"></span>${p.language}`
+    : '';
+
+  card.innerHTML = `
+    <div class="gallery-info">
+      <h4>${p.name}</h4>
+      ${langBadge ? `<div class="project-meta">${langBadge}</div>` : ''}
+      <p>${p.description || ''}</p>
+    </div>
+    <div class="gallery-actions">
+      <a class="btn" href="${p.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open</a>
+      <a class="btn btn-ghost" href="${p.githubUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">GitHub</a>
+    </div>
+  `;
+
+  if (currentUser) card.appendChild(buildDeleteBtn(p));
+  return card;
 }
 
 function buildCard(p) {
@@ -203,19 +262,7 @@ function buildCard(p) {
     </div>
   `;
 
-  if (currentUser) {
-    const del = document.createElement('button');
-    del.className = 'delete-btn';
-    del.title = 'Remove';
-    del.textContent = '×';
-    del.addEventListener('click', async e => {
-      e.stopPropagation();
-      if (!confirm(`Remove "${p.name}"?`)) return;
-      await apiFetch(`/api/projects/${p.id}`, { method: 'DELETE' });
-      await loadProjects();
-    });
-    card.appendChild(del);
-  }
+  if (currentUser) card.appendChild(buildDeleteBtn(p));
 
   return card;
 }
