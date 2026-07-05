@@ -358,6 +358,69 @@ a:hover { text-decoration: underline; }
   padding: 3rem 0;
 }
 
+/* ── More-projects Gallery ───────────────────────────
+   The featured three carry rich preview cards above; everything else lives
+   here in a lighter, always-visible grid so nothing is hidden. */
+#gallery-wrap {
+  margin-top: 3rem;
+  border-top: 1px solid var(--border);
+  padding-top: 2rem;
+}
+
+.gallery-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+}
+
+.project-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.gallery-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem;
+  cursor: pointer;
+  transition: border-color .2s, transform .2s;
+  position: relative;
+}
+
+.gallery-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.gallery-info { flex: 1; }
+
+.gallery-card h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: .4rem;
+  color: var(--text);
+}
+
+.gallery-card p {
+  font-size: .825rem;
+  margin-bottom: 1rem;
+}
+
+.gallery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.gallery-actions .btn { margin-right: 0; }
+
 /* ── About Edit ──────────────────────────────────── */
 #about-textarea {
   width: 100%;
@@ -472,6 +535,7 @@ a:hover { text-decoration: underline; }
   .hero { padding: 0 1.25rem; }
   .section { padding: 3.5rem 1.25rem; }
   .project-grid { grid-template-columns: 1fr; }
+  .project-gallery { grid-template-columns: 1fr; }
 
   /* Admin form: stack to full-width column */
   #add-form { flex-direction: column; }
