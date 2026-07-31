@@ -296,6 +296,21 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { ok: true }); return;
     }
 
+    if (method === 'PATCH' && urlPath.startsWith('/api/projects/')) {
+      if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
+      const id = urlPath.split('/').pop();
+      if (!id) { json(res, 400, { error: 'id required' }); return; }
+      const raw = await readBody(req);
+      const body = parseJsonBody(raw);
+      if (!body) { json(res, 400, { error: 'JSON body required' }); return; }
+      const patch: Record<string, string> = {};
+      for (const key of ['name', 'description', 'language', 'url', 'githubUrl'] as const) {
+        if (typeof body[key] === 'string') patch[key] = (body[key] as string).trim();
+      }
+      await store.update(id, patch);
+      json(res, 200, { ok: true }); return;
+    }
+
     if (method === 'DELETE' && urlPath.startsWith('/api/projects/')) {
       if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
       const id = urlPath.split('/').pop();
