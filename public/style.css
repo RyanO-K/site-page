@@ -560,6 +560,24 @@ a:hover { text-decoration: underline; }
 
 #contact-cancel:hover { border-color: var(--text); color: var(--text); }
 
+/* ── Drag-and-drop reorder ───────────────────────── */
+.project-card[draggable="true"],
+.gallery-card[draggable="true"] {
+  cursor: grab;
+}
+
+.project-card.dragging,
+.gallery-card.dragging {
+  opacity: .4;
+  cursor: grabbing;
+}
+
+.project-card.drag-over,
+.gallery-card.drag-over {
+  border-color: var(--accent);
+  box-shadow: -3px 0 0 var(--accent);
+}
+
 /* ── Footer ──────────────────────────────────────── */
 .site-footer {
   padding: 2rem;

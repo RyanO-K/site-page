@@ -19,10 +19,12 @@ export interface Project {
 }
 
 export interface Store {
-  /** Newest-first. */
+  /** Newest-first (or user-defined order after reorder). */
   list(): Promise<Project[]>;
   add(project: Project): Promise<void>;
   remove(id: string): Promise<void>;
+  /** Persist a full reorder; ids must contain all project ids in the desired order. */
+  reorder(ids: string[]): Promise<void>;
   getAbout(): Promise<string>;
   setAbout(content: string): Promise<void>;
   getContact(): Promise<string>;
@@ -63,6 +65,15 @@ class FileStore implements Store {
   async remove(id: string): Promise<void> {
     const all = (await this.list()).filter(p => p.id !== id);
     fs.writeFileSync(this.file, JSON.stringify(all, null, 2));
+  }
+
+  async reorder(ids: string[]): Promise<void> {
+    const all = await this.list();
+    const map = new Map(all.map(p => [p.id, p]));
+    const inIds = new Set(ids);
+    const ordered = ids.map(id => map.get(id)).filter((p): p is Project => p !== undefined);
+    const rest = all.filter(p => !inIds.has(p.id));
+    fs.writeFileSync(this.file, JSON.stringify([...ordered, ...rest], null, 2));
   }
 
   async getAbout(): Promise<string> {
@@ -112,6 +123,9 @@ class PgStore implements Store {
       )
     `);
     await this.pool.query(`
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT -1
+    `);
+    await this.pool.query(`
       CREATE TABLE IF NOT EXISTS settings (
         key   text PRIMARY KEY,
         value text NOT NULL
@@ -125,7 +139,8 @@ class PgStore implements Store {
       `SELECT id, repo, name, description, language, url,
               github_url AS "githubUrl", added_at AS "addedAt"
          FROM projects
-        ORDER BY added_at DESC`,
+        ORDER BY CASE WHEN sort_order >= 0 THEN sort_order ELSE NULL END ASC NULLS LAST,
+                 added_at DESC`,
     );
     // bigint arrives as a string from node-postgres; addedAt (ms) fits in a JS number.
     return rows.map(r => ({ ...r, addedAt: Number(r.addedAt) })) as Project[];
@@ -145,6 +160,30 @@ class PgStore implements Store {
   async remove(id: string): Promise<void> {
     await this.ready;
     await this.pool.query('DELETE FROM projects WHERE id = $1', [id]);
+  }
+
+  async reorder(ids: string[]): Promise<void> {
+    await this.ready;
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('UPDATE projects SET sort_order = -1');
+      if (ids.length) {
+        await client.query(
+          `UPDATE projects SET sort_order = v.ord
+             FROM (SELECT unnest($1::text[]) AS id,
+                          generate_subscripts($1::text[], 1) - 1 AS ord) AS v
+            WHERE projects.id = v.id`,
+          [ids],
+        );
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
   }
 
   async getAbout(): Promise<string> {

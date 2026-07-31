@@ -285,6 +285,17 @@ const server = http.createServer(async (req, res) => {
       json(res, 201, project); return;
     }
 
+    if (method === 'PUT' && urlPath === '/api/projects/reorder') {
+      if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
+      const raw = await readBody(req);
+      const body = parseJsonBody(raw);
+      if (!body || !Array.isArray(body.ids) || !(body.ids as unknown[]).every(x => typeof x === 'string')) {
+        json(res, 400, { error: 'ids (string[]) required' }); return;
+      }
+      await store.reorder(body.ids as string[]);
+      json(res, 200, { ok: true }); return;
+    }
+
     if (method === 'DELETE' && urlPath.startsWith('/api/projects/')) {
       if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
       const id = urlPath.split('/').pop();
