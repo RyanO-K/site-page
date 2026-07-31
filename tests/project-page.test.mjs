@@ -100,6 +100,15 @@ test('the embed shell redirects same-origin targets instead of framing them', as
   assert.match(js, /location\.replace/);
 });
 
+test('the shell hands the keyboard to the framed project', async () => {
+  // A project reads keys at its own document, which sees nothing while this
+  // shell holds focus — the games loaded looking dead until you clicked the
+  // canvas. Focusing the frame on load is what makes them playable on arrival.
+  const res = await fetch(`${BASE}/project/embed.js`);
+  const js = await res.text();
+  assert.match(js, /frame\.focus\(\)/);
+});
+
 test('the embed shell keeps the frame hidden until load', async () => {
   // The cold-start status panel is the whole point of the shell: a bare iframe
   // pointed at a sleeping free instance is a blank white box for 12-50s.

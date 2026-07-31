@@ -123,6 +123,12 @@ async function main() {
     timers.forEach(clearTimeout);
     status.hidden = true;
     frame.classList.add('ready');
+
+    // Hand the keyboard to the framed page. A project reads keys at its own
+    // document, which never sees them while this shell holds focus — so the
+    // games arrived dead and the first thing a visitor had to do was click the
+    // canvas to wake them up. Focusing the frame skips that.
+    frame.focus();
   });
 
   frame.addEventListener('error', () => {
