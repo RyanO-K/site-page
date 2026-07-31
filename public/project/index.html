@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project — okeefe.work</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    /* Full-bleed embed shell. Scoped here rather than in the global stylesheet
+       since nothing else on the site is a chromed full-viewport frame. */
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    .embed-bar {
+      display: flex; align-items: center; gap: 1rem;
+      padding: 0 1rem; height: var(--nav-h); flex: 0 0 auto;
+      background: var(--bg-alt); border-bottom: 1px solid var(--border);
+    }
+    .embed-bar h1 {
+      font-size: 1rem; font-weight: 600; margin: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .embed-bar .spacer { flex: 1 1 auto; }
+    .embed-bar a.back { color: var(--muted); text-decoration: none; white-space: nowrap; }
+    .embed-bar a.back:hover { color: var(--text); }
+    .embed-bar .btn { white-space: nowrap; }
+
+    .embed-stage { position: relative; flex: 1 1 auto; min-height: 0; background: var(--bg); }
+    .embed-stage iframe {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      border: 0; opacity: 0; transition: opacity .3s ease;
+    }
+    .embed-stage iframe.ready { opacity: 1; }
+
+    .embed-status {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1rem;
+      text-align: center; padding: 2rem; color: var(--muted);
+    }
+    .embed-status[hidden] { display: none; }
+    .embed-status h2 { font-size: 1.1rem; color: var(--text); margin: 0; font-weight: 600; }
+    .embed-status p { margin: 0; max-width: 34rem; font-size: .9rem; }
+
+    .spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation-duration: 3s; }
+      .embed-stage iframe { transition: none; }
+    }
+
+    @media (max-width: 600px) {
+      .embed-bar { gap: .6rem; padding: 0 .7rem; }
+      .embed-bar .btn { padding: .3rem .6rem; font-size: .8rem; }
+      .embed-bar a.back span { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="embed-bar">
+    <a class="back" href="/#projects" aria-label="Back to projects">←<span> Projects</span></a>
+    <h1 id="embed-title">Loading…</h1>
+    <div class="spacer"></div>
+    <a class="btn" id="embed-open" href="#" target="_blank" rel="noopener">Open ↗</a>
+    <a class="btn btn-ghost" id="embed-github" href="#" target="_blank" rel="noopener" hidden>GitHub</a>
+  </header>
+
+  <main class="embed-stage">
+    <div class="embed-status" id="embed-status" role="status" aria-live="polite">
+      <div class="spinner" id="embed-spinner"></div>
+      <h2 id="embed-status-title">Loading…</h2>
+      <p id="embed-status-detail"></p>
+    </div>
+    <iframe
+      id="embed-frame"
+      title="Project preview"
+      allow="fullscreen; gamepad"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock"
+    ></iframe>
+  </main>
+
+  <script src="/project/embed.js"></script>
+</body>
+</html>

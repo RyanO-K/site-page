@@ -212,7 +212,7 @@ function buildGalleryCard(p) {
   const card = document.createElement('div');
   card.className = 'gallery-card';
   card.dataset.id = p.id;
-  card.addEventListener('click', () => window.open(p.url, '_blank'));
+  card.addEventListener('click', () => { window.location.href = `/p/${p.id}`; });
 
   const langColor = LANG_COLORS[p.language] ?? '#888';
   const langBadge = p.language
@@ -239,7 +239,7 @@ function buildCard(p) {
   const card = document.createElement('div');
   card.className = 'project-card';
   card.dataset.id = p.id;
-  card.addEventListener('click', () => window.open(p.url, '_blank'));
+  card.addEventListener('click', () => { window.location.href = `/p/${p.id}`; });
 
   const langColor = LANG_COLORS[p.language] ?? '#888';
   const langBadge = p.language

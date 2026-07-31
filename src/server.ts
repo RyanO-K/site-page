@@ -327,6 +327,20 @@ const server = http.createServer(async (req, res) => {
       }); return;
     }
 
+    // Project pages: /p/<id> embeds a separately-hosted project in an iframe.
+    // One static shell for every project — it reads the id from the url and
+    // looks the embed target up in /api/projects, so adding a project is a
+    // database row, not a deploy. Any /p/... path serves the same shell; the
+    // client 404s an unknown id itself.
+    if (urlPath === '/p' || urlPath === '/p/') {
+      res.writeHead(302, { Location: '/#projects' });
+      res.end(); return;
+    }
+
+    if (urlPath.startsWith('/p/')) {
+      serveFile(res, path.join(PUBLIC_DIR, 'project', 'index.html')); return;
+    }
+
     // Static showcase routes (see SHOWCASES). This runs after the per-game
     // scores APIs above, so /snake/api/scores and /stacker/api/scores are
     // already handled and never fall through to a file lookup here.
