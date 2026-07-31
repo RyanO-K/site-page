@@ -12,10 +12,12 @@ async function init() {
   currentUser = me.user;
   renderAuth();
   await loadAbout();
+  await loadContact();
   await loadProjects();
   if (currentUser) {
     setupAdminPanel();
     setupAboutEdit();
+    setupContactEdit();
   }
 }
 
@@ -130,6 +132,76 @@ function setupAboutEdit() {
   });
 }
 
+async function loadContact() {
+  const { content } = await apiFetch('/api/contact');
+  document.getElementById('contact-content').innerHTML = content;
+}
+
+function setupContactEdit() {
+  const editBtn = document.getElementById('contact-edit-btn');
+  const editPanel = document.getElementById('contact-edit');
+  const contentDiv = document.getElementById('contact-content');
+  const editor = document.getElementById('contact-editor');
+  const saveBtn = document.getElementById('contact-save');
+  const cancelBtn = document.getElementById('contact-cancel');
+  const errEl = document.getElementById('contact-error');
+
+  editBtn.hidden = false;
+
+  editBtn.addEventListener('click', () => {
+    editor.innerHTML = contentDiv.innerHTML;
+    editBtn.hidden = true;
+    contentDiv.hidden = true;
+    editPanel.hidden = false;
+    errEl.hidden = true;
+    editor.focus();
+  });
+
+  editPanel.querySelectorAll('.rtf-toolbar [data-cmd]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.execCommand(btn.dataset.cmd, false, null);
+      editor.focus();
+    });
+  });
+
+  document.getElementById('contact-link-btn').addEventListener('click', () => {
+    const url = prompt('Enter URL:');
+    if (url) document.execCommand('createLink', false, url);
+    editor.focus();
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    editPanel.hidden = true;
+    contentDiv.hidden = false;
+    editBtn.hidden = false;
+    errEl.hidden = true;
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const content = editor.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    errEl.hidden = true;
+    try {
+      await apiFetch('/api/contact', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      contentDiv.innerHTML = content;
+      editPanel.hidden = true;
+      contentDiv.hidden = false;
+      editBtn.hidden = false;
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  });
+}
+
 function setupAdminPanel() {
   const panel = document.getElementById('admin-panel');
   panel.hidden = false;
@@ -169,11 +241,20 @@ function setupAdminPanel() {
 // into the compact gallery below.
 const FEATURED_COUNT = 3;
 
+// Canonical ordered list, kept in sync with the server after each load/reorder.
+let projectsList = [];
+// ID of the card currently being dragged (null when no drag in progress).
+let dragSrcId = null;
+
 async function loadProjects() {
+  projectsList = await apiFetch('/api/projects');
+  renderProjects(projectsList);
+}
+
+function renderProjects(projects) {
   const grid = document.getElementById('project-grid');
   const galleryWrap = document.getElementById('gallery-wrap');
   const gallery = document.getElementById('project-gallery');
-  const projects = await apiFetch('/api/projects');
   grid.innerHTML = '';
   gallery.innerHTML = '';
   galleryWrap.hidden = true;
@@ -189,6 +270,69 @@ async function loadProjects() {
     for (const p of rest) gallery.appendChild(buildGalleryCard(p));
     galleryWrap.hidden = false;
   }
+}
+
+/** Attach HTML5 drag-and-drop handlers to a card element (admin-only). */
+function addDragHandlers(card, p) {
+  card.draggable = true;
+
+  card.addEventListener('dragstart', e => {
+    dragSrcId = p.id;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    // Required for Firefox to initiate drag
+    e.dataTransfer.setData('text/plain', p.id);
+  });
+
+  card.addEventListener('dragend', () => {
+    dragSrcId = null;
+    card.classList.remove('dragging');
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  });
+
+  card.addEventListener('dragover', e => {
+    if (!dragSrcId || dragSrcId === p.id) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    card.classList.add('drag-over');
+  });
+
+  card.addEventListener('dragleave', e => {
+    // Only clear if leaving to outside this card (not into a child element)
+    if (!card.contains(e.relatedTarget)) card.classList.remove('drag-over');
+  });
+
+  card.addEventListener('drop', async e => {
+    e.preventDefault();
+    if (!dragSrcId || dragSrcId === p.id) return;
+    card.classList.remove('drag-over');
+
+    const fromIdx = projectsList.findIndex(x => x.id === dragSrcId);
+    if (fromIdx === -1) return;
+
+    const newOrder = [...projectsList];
+    const [removed] = newOrder.splice(fromIdx, 1);
+    // Find target in the updated array (indices may have shifted after removal)
+    const toIdx = newOrder.findIndex(x => x.id === p.id);
+    if (toIdx === -1) return;
+    newOrder.splice(toIdx, 0, removed);
+
+    projectsList = newOrder;
+    renderProjects(projectsList);
+
+    try {
+      await apiFetch('/api/projects/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: newOrder.map(x => x.id) }),
+      });
+    } catch (err) {
+      console.error('[reorder] failed:', err.message);
+      // Revert to server state on failure
+      await loadProjects();
+    }
+  });
 }
 
 /** A delete button for admins; shared by both card styles. */
@@ -231,7 +375,10 @@ function buildGalleryCard(p) {
     </div>
   `;
 
-  if (currentUser) card.appendChild(buildDeleteBtn(p));
+  if (currentUser) {
+    card.appendChild(buildDeleteBtn(p));
+    addDragHandlers(card, p);
+  }
   return card;
 }
 
@@ -262,7 +409,10 @@ function buildCard(p) {
     </div>
   `;
 
-  if (currentUser) card.appendChild(buildDeleteBtn(p));
+  if (currentUser) {
+    card.appendChild(buildDeleteBtn(p));
+    addDragHandlers(card, p);
+  }
 
   return card;
 }

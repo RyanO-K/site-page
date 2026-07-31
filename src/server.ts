@@ -210,6 +210,21 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { ok: true }); return;
     }
 
+    if (method === 'GET' && urlPath === '/api/contact') {
+      json(res, 200, { content: await store.getContact() }); return;
+    }
+
+    if (method === 'PUT' && urlPath === '/api/contact') {
+      if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
+      const raw = await readBody(req);
+      const body = parseJsonBody(raw);
+      if (!body || typeof body.content !== 'string') {
+        json(res, 400, { error: 'content field required' }); return;
+      }
+      await store.setContact(body.content as string);
+      json(res, 200, { ok: true }); return;
+    }
+
     if (method === 'GET' && urlPath === '/api/projects') {
       json(res, 200, await store.list()); return;
     }
@@ -268,6 +283,17 @@ const server = http.createServer(async (req, res) => {
       await store.add(project);
       console.log(`[projects] added "${project.name}" (id=${project.id})`);
       json(res, 201, project); return;
+    }
+
+    if (method === 'PUT' && urlPath === '/api/projects/reorder') {
+      if (!getSessionUser(req)) { json(res, 401, { error: 'Unauthorized' }); return; }
+      const raw = await readBody(req);
+      const body = parseJsonBody(raw);
+      if (!body || !Array.isArray(body.ids) || !(body.ids as unknown[]).every(x => typeof x === 'string')) {
+        json(res, 400, { error: 'ids (string[]) required' }); return;
+      }
+      await store.reorder(body.ids as string[]);
+      json(res, 200, { ok: true }); return;
     }
 
     if (method === 'DELETE' && urlPath.startsWith('/api/projects/')) {
