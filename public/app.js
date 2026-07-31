@@ -12,10 +12,12 @@ async function init() {
   currentUser = me.user;
   renderAuth();
   await loadAbout();
+  await loadContact();
   await loadProjects();
   if (currentUser) {
     setupAdminPanel();
     setupAboutEdit();
+    setupContactEdit();
   }
 }
 
@@ -117,6 +119,76 @@ function setupAboutEdit() {
         body: JSON.stringify({ content }),
       });
       contentDiv.innerHTML = renderMarkdown(content);
+      editPanel.hidden = true;
+      contentDiv.hidden = false;
+      editBtn.hidden = false;
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.hidden = false;
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  });
+}
+
+async function loadContact() {
+  const { content } = await apiFetch('/api/contact');
+  document.getElementById('contact-content').innerHTML = content;
+}
+
+function setupContactEdit() {
+  const editBtn = document.getElementById('contact-edit-btn');
+  const editPanel = document.getElementById('contact-edit');
+  const contentDiv = document.getElementById('contact-content');
+  const editor = document.getElementById('contact-editor');
+  const saveBtn = document.getElementById('contact-save');
+  const cancelBtn = document.getElementById('contact-cancel');
+  const errEl = document.getElementById('contact-error');
+
+  editBtn.hidden = false;
+
+  editBtn.addEventListener('click', () => {
+    editor.innerHTML = contentDiv.innerHTML;
+    editBtn.hidden = true;
+    contentDiv.hidden = true;
+    editPanel.hidden = false;
+    errEl.hidden = true;
+    editor.focus();
+  });
+
+  editPanel.querySelectorAll('.rtf-toolbar [data-cmd]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.execCommand(btn.dataset.cmd, false, null);
+      editor.focus();
+    });
+  });
+
+  document.getElementById('contact-link-btn').addEventListener('click', () => {
+    const url = prompt('Enter URL:');
+    if (url) document.execCommand('createLink', false, url);
+    editor.focus();
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    editPanel.hidden = true;
+    contentDiv.hidden = false;
+    editBtn.hidden = false;
+    errEl.hidden = true;
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const content = editor.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    errEl.hidden = true;
+    try {
+      await apiFetch('/api/contact', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      contentDiv.innerHTML = content;
       editPanel.hidden = true;
       contentDiv.hidden = false;
       editBtn.hidden = false;
