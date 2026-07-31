@@ -7,6 +7,13 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Single error slot. Every reported error reuses this one element rather
+       than stacking, so repeated failures replace in place instead of piling up. -->
+  <div id="error-banner" class="error-banner" role="alert" aria-live="assertive" hidden>
+    <span id="error-banner-text"></span>
+    <button type="button" id="error-banner-dismiss" class="error-banner-dismiss" aria-label="Dismiss error">×</button>
+  </div>
+
   <header class="site-header">
     <nav class="nav">
       <span class="nav-logo">Ryan O'Keefe</span>
@@ -42,7 +49,6 @@
             <button id="about-save">Save</button>
             <button id="about-cancel" class="btn-ghost">Cancel</button>
           </div>
-          <p id="about-error" class="add-error" hidden></p>
         </div>
         <button id="about-edit-btn" hidden>Edit</button>
       </div>
@@ -58,7 +64,6 @@
             <input type="url" id="input-url" placeholder="Hosted URL" required />
             <button type="submit">Add Project</button>
           </form>
-          <p id="add-error" class="add-error" hidden></p>
         </div>
 
         <div id="project-grid" class="project-grid">
@@ -90,7 +95,6 @@
             <button id="contact-save">Save</button>
             <button id="contact-cancel" class="btn-ghost">Cancel</button>
           </div>
-          <p id="contact-error" class="add-error" hidden></p>
         </div>
         <button id="contact-edit-btn" hidden>Edit</button>
       </div>

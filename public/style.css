@@ -204,7 +204,49 @@ a:hover { text-decoration: underline; }
 
 #add-form button:disabled { opacity: .5; cursor: default; }
 
-.add-error { color: var(--danger); font-size: .825rem; margin-top: .5rem; }
+/* ── Error banner ────────────────────────────────────
+   A single reused slot, so a second error replaces the first in place rather
+   than stacking up the screen. Sits above the sticky header. */
+.error-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;                       /* above .site-header */
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .6rem 1rem;
+  background: #2a1215;
+  border-bottom: 1px solid var(--danger);
+  color: #ffb4b4;
+  font-size: .825rem;
+  line-height: 1.45;
+}
+.error-banner[hidden] { display: none; }
+
+#error-banner-text {
+  flex: 1 1 auto;
+  /* Long messages wrap rather than pushing the dismiss button off-screen.
+     The cap is generous — real API errors run several lines on a phone, and
+     clipping one mid-word reads as a broken banner rather than a long message.
+     It only engages for pathological input, and scrolls when it does. */
+  overflow-wrap: anywhere;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.error-banner-dismiss {
+  flex: 0 0 auto;
+  background: none;
+  border: 0;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 .25rem;
+  cursor: pointer;
+  opacity: .75;
+}
+.error-banner-dismiss:hover { opacity: 1; }
+.error-banner-dismiss:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
 
 /* ── Project Grid ────────────────────────────────── */
 .project-grid {

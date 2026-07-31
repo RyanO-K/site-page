@@ -6,18 +6,69 @@ const LANG_COLORS = {
 
 let currentUser = null;
 
+/**
+ * Report a failure: full detail to the console, a short line to the single
+ * error slot in the page.
+ *
+ * There is deliberately one slot, not a stack — a flaky endpoint hit three
+ * times should replace its message, not paper over the site. `context` says
+ * which action failed, since the raw message alone ("Unauthorized") rarely
+ * tells you what you were doing.
+ */
+function reportError(context, err) {
+  const detail = err instanceof Error ? err.message : String(err);
+  console.error(`[${context}]`, err);
+
+  const banner = document.getElementById('error-banner');
+  const text = document.getElementById('error-banner-text');
+  if (!banner || !text) return;   // shell pages (e.g. /p/<id>) have no banner
+
+  text.textContent = `${context}: ${detail}`;
+  banner.hidden = false;
+  banner.scrollTop = 0;
+}
+
+function dismissError() {
+  const banner = document.getElementById('error-banner');
+  if (banner) banner.hidden = true;
+}
+
+/** Run an async action, surfacing any failure instead of dropping it. */
+async function guard(context, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    reportError(context, err);
+    return undefined;
+  }
+}
+
 async function init() {
+  document.getElementById('error-banner-dismiss')?.addEventListener('click', dismissError);
+
+  // Nothing else can report a failure if these escape, so they get their own net.
+  window.addEventListener('unhandledrejection', e => reportError('Unhandled error', e.reason));
+  window.addEventListener('error', e => reportError('Script error', e.error ?? e.message));
+
   setupNav();
-  const me = await apiFetch('/api/me');
-  currentUser = me.user;
+
+  // Each step is guarded separately: a failing About section should not stop
+  // projects from loading, and losing your session should not leave the page
+  // half-built with no explanation.
+  const me = await guard('Checking sign-in', () => apiFetch('/api/me'));
+  currentUser = me?.user ?? null;
   renderAuth();
-  await loadAbout();
-  await loadContact();
-  await loadProjects();
+
+  await guard('Loading About', loadAbout);
+  await guard('Loading Contact', loadContact);
+  await guard('Loading projects', loadProjects);
+
   if (currentUser) {
-    setupAdminPanel();
-    setupAboutEdit();
-    setupContactEdit();
+    guard('Setting up admin tools', () => {
+      setupAdminPanel();
+      setupAboutEdit();
+      setupContactEdit();
+    });
   }
 }
 
@@ -89,7 +140,6 @@ function setupAboutEdit() {
   const contentDiv = document.getElementById('about-content');
   const saveBtn = document.getElementById('about-save');
   const cancelBtn = document.getElementById('about-cancel');
-  const errEl = document.getElementById('about-error');
 
   editBtn.hidden = false;
 
@@ -97,21 +147,18 @@ function setupAboutEdit() {
     editBtn.hidden = true;
     contentDiv.hidden = true;
     editPanel.hidden = false;
-    errEl.hidden = true;
   });
 
   cancelBtn.addEventListener('click', () => {
     editPanel.hidden = true;
     contentDiv.hidden = false;
     editBtn.hidden = false;
-    errEl.hidden = true;
   });
 
   saveBtn.addEventListener('click', async () => {
     const content = document.getElementById('about-textarea').value;
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
-    errEl.hidden = true;
     try {
       await apiFetch('/api/about', {
         method: 'PUT',
@@ -123,8 +170,7 @@ function setupAboutEdit() {
       contentDiv.hidden = false;
       editBtn.hidden = false;
     } catch (err) {
-      errEl.textContent = err.message;
-      errEl.hidden = false;
+      reportError('Saving About', err);
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save';
@@ -144,7 +190,6 @@ function setupContactEdit() {
   const editor = document.getElementById('contact-editor');
   const saveBtn = document.getElementById('contact-save');
   const cancelBtn = document.getElementById('contact-cancel');
-  const errEl = document.getElementById('contact-error');
 
   editBtn.hidden = false;
 
@@ -153,7 +198,6 @@ function setupContactEdit() {
     editBtn.hidden = true;
     contentDiv.hidden = true;
     editPanel.hidden = false;
-    errEl.hidden = true;
     editor.focus();
   });
 
@@ -174,14 +218,12 @@ function setupContactEdit() {
     editPanel.hidden = true;
     contentDiv.hidden = false;
     editBtn.hidden = false;
-    errEl.hidden = true;
   });
 
   saveBtn.addEventListener('click', async () => {
     const content = editor.innerHTML;
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
-    errEl.hidden = true;
     try {
       await apiFetch('/api/contact', {
         method: 'PUT',
@@ -193,8 +235,7 @@ function setupContactEdit() {
       contentDiv.hidden = false;
       editBtn.hidden = false;
     } catch (err) {
-      errEl.textContent = err.message;
-      errEl.hidden = false;
+      reportError('Saving Contact', err);
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save';
@@ -212,10 +253,9 @@ function setupAdminPanel() {
     const payload = { repo, url };
     console.log('[add-project] submit intercepted; payload =', payload);
     const btn = e.target.querySelector('button');
-    const errEl = document.getElementById('add-error');
-    errEl.hidden = true;
     btn.disabled = true;
     btn.textContent = 'Adding…';
+    dismissError();
     try {
       const created = await apiFetch('/api/projects', {
         method: 'POST',
@@ -227,9 +267,7 @@ function setupAdminPanel() {
       document.getElementById('input-url').value = '';
       await loadProjects();
     } catch (err) {
-      console.error('[add-project] failed:', err.message);
-      errEl.textContent = err.message;
-      errEl.hidden = false;
+      reportError('Adding project', err);
     } finally {
       btn.disabled = false;
       btn.textContent = 'Add Project';
@@ -328,8 +366,8 @@ function addDragHandlers(card, p) {
         body: JSON.stringify({ ids: newOrder.map(x => x.id) }),
       });
     } catch (err) {
-      console.error('[reorder] failed:', err.message);
-      // Revert to server state on failure
+      // The reorder was applied optimistically, so say why it snapped back.
+      reportError('Saving project order', err);
       await loadProjects();
     }
   });
@@ -344,8 +382,10 @@ function buildDeleteBtn(p) {
   del.addEventListener('click', async e => {
     e.stopPropagation();
     if (!confirm(`Remove "${p.name}"?`)) return;
-    await apiFetch(`/api/projects/${p.id}`, { method: 'DELETE' });
-    await loadProjects();
+    await guard(`Removing "${p.name}"`, async () => {
+      await apiFetch(`/api/projects/${p.id}`, { method: 'DELETE' });
+      await loadProjects();
+    });
   });
   return del;
 }
@@ -418,11 +458,35 @@ function buildCard(p) {
 }
 
 async function apiFetch(url, options) {
-  const res = await fetch(url, options);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `${res.status} ${res.statusText}`);
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (err) {
+    // fetch only rejects on network-level failure, which reads very differently
+    // from an HTTP error and deserves saying so.
+    throw new Error(`Could not reach the server (${err.message})`);
   }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+
+    // Sessions live in server memory, so every deploy and every free-tier idle
+    // spin-down silently invalidates them. Without this the admin UI just stops
+    // responding and the raw body ({"error":"Unauthorized"}) explains nothing.
+    if (res.status === 401) {
+      throw new Error('Your session expired — sign in again to make changes.');
+    }
+
+    // Prefer the API's own {"error": "..."} message over the raw JSON blob.
+    let message = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.error === 'string') message = parsed.error;
+    } catch { /* not JSON — use the text as-is */ }
+
+    throw new Error(message || `${res.status} ${res.statusText}`);
+  }
+
   if (res.headers.get('content-type')?.includes('application/json')) return res.json();
   return null;
 }
