@@ -61,6 +61,23 @@ async function main() {
     return;
   }
 
+  // Same-origin targets are pages of this site (the static /kanban and /discord
+  // showcases, and the row that points at the site itself). Framing those would
+  // nest okeefe.work inside okeefe.work to no benefit, so just go there. Only
+  // separately-hosted projects are worth the shell.
+  let target;
+  try {
+    target = new URL(project.url, window.location.href);
+  } catch {
+    fail('Invalid project url', `"${project.url}" is not a url this page can open.`);
+    return;
+  }
+
+  if (target.origin === window.location.origin) {
+    window.location.replace(target.href);
+    return;
+  }
+
   document.title = `${project.name} — okeefe.work`;
   el('embed-title').textContent = project.name;
 
@@ -104,7 +121,7 @@ async function main() {
     fail('Could not load this project', `${project.name} did not respond. Try opening it directly.`);
   });
 
-  frame.src = project.url;
+  frame.src = target.href;
 }
 
 main();

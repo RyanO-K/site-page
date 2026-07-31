@@ -370,7 +370,7 @@ function buildGalleryCard(p) {
       <p>${p.description || ''}</p>
     </div>
     <div class="gallery-actions">
-      <a class="btn" href="${p.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open</a>
+      <a class="btn" href="/p/${p.id}" onclick="event.stopPropagation()">Open</a>
       <a class="btn btn-ghost" href="${p.githubUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">GitHub</a>
     </div>
   `;
@@ -403,7 +403,7 @@ function buildCard(p) {
       ${langBadge ? `<div class="project-meta">${langBadge}</div>` : ''}
       <p>${p.description || ''}</p>
       <div style="margin-top:.75rem">
-        <a class="btn" href="${p.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open</a>
+        <a class="btn" href="/p/${p.id}" onclick="event.stopPropagation()">Open</a>
         <a class="btn btn-ghost" href="${p.githubUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">GitHub</a>
       </div>
     </div>

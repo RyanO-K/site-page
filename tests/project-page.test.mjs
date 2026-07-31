@@ -90,6 +90,16 @@ test('the embed script is served as JavaScript', async () => {
   assert.match(res.headers.get('content-type') ?? '', /javascript/);
 });
 
+// Not every project row is separately hosted: /kanban and /discord are pages of
+// this site, and one row points at the site itself. Framing those would nest
+// okeefe.work inside okeefe.work, so the shell navigates instead of embedding.
+test('the embed shell redirects same-origin targets instead of framing them', async () => {
+  const res = await fetch(`${BASE}/project/embed.js`);
+  const js = await res.text();
+  assert.match(js, /target\.origin === window\.location\.origin/);
+  assert.match(js, /location\.replace/);
+});
+
 test('the embed shell keeps the frame hidden until load', async () => {
   // The cold-start status panel is the whole point of the shell: a bare iframe
   // pointed at a sleeping free instance is a blank white box for 12-50s.
