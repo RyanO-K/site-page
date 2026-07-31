@@ -99,14 +99,40 @@ const MIME: Record<string, string> = {
   '.svg': 'image/svg+xml', '.webp': 'image/webp',
 };
 
-function serveStatic(res: http.ServerResponse, urlPath: string): void {
-  const abs = path.join(PUBLIC_DIR, urlPath === '/' ? '/index.html' : urlPath);
+// Static showcases served out of public/<slug>/. Each entry gets a bare-path
+// 301 to the trailing-slash form plus file serving; the loop in the request
+// handler is the single implementation. Adding a showcase = add the slug here
+// and commit public/<slug>/, which is why this is a code table and not a
+// database lookup: the assets ship with the deploy, so the set of real routes
+// is fixed at build time. (Slugs also index the filesystem — sourcing them from
+// user-writable rows would turn a project insert into a file-read primitive.)
+const SHOWCASES = ['snake', 'stacker', 'kanban', 'discord'];
+
+/**
+ * Join untrusted url segments under `root`, or return null if the result
+ * escapes it. `path.join` alone is NOT safe here: it resolves '..', so a raw
+ * request for /kanban/../../package.json reads outside public/. Browsers and
+ * Cloudflare normalize such paths, but the origin must not depend on that.
+ */
+function safeJoin(root: string, ...parts: string[]): string | null {
+  const abs = path.resolve(root, '.' + path.posix.join('/', ...parts));
+  return abs === root || abs.startsWith(root + path.sep) ? abs : null;
+}
+
+/** Read `abs` and respond, with shared MIME handling and a clean 404. */
+function serveFile(res: http.ServerResponse, abs: string): void {
   const ext = path.extname(abs);
   fs.readFile(abs, (err, data) => {
     if (err) { res.writeHead(404); res.end('Not found'); return; }
     res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
     res.end(data);
   });
+}
+
+function serveStatic(res: http.ServerResponse, urlPath: string): void {
+  const abs = safeJoin(PUBLIC_DIR, urlPath === '/' ? '/index.html' : urlPath);
+  if (abs === null) { res.writeHead(404); res.end('Not found'); return; }
+  serveFile(res, abs);
 }
 
 function json(res: http.ServerResponse, status: number, body: unknown): void {
@@ -276,22 +302,6 @@ const server = http.createServer(async (req, res) => {
       }); return;
     }
 
-    if (urlPath === '/snake') {
-      res.writeHead(301, { Location: '/snake/' });
-      res.end(); return;
-    }
-
-    if (urlPath.startsWith('/snake/')) {
-      const snakePath = urlPath.slice(7) || '/';
-      const staticPath = path.join(PUBLIC_DIR, '/snake', snakePath === '/' ? '/index.html' : snakePath);
-      const ext = path.extname(staticPath);
-      fs.readFile(staticPath, (err, data) => {
-        if (err) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
-        res.end(data);
-      }); return;
-    }
-
     if (method === 'GET' && urlPath === '/stacker/api/scores') {
       const board = readStackerScoreBoard();
       json(res, 200, board); return;
@@ -317,58 +327,21 @@ const server = http.createServer(async (req, res) => {
       }); return;
     }
 
-    if (urlPath === '/stacker') {
-      res.writeHead(301, { Location: '/stacker/' });
-      res.end(); return;
-    }
+    // Static showcase routes (see SHOWCASES). This runs after the per-game
+    // scores APIs above, so /snake/api/scores and /stacker/api/scores are
+    // already handled and never fall through to a file lookup here.
+    for (const slug of SHOWCASES) {
+      if (urlPath === `/${slug}`) {
+        res.writeHead(301, { Location: `/${slug}/` });
+        res.end(); return;
+      }
 
-    if (urlPath.startsWith('/stacker/')) {
-      const stackerPath = urlPath.slice(9) || '/';
-      const staticPath = path.join(PUBLIC_DIR, '/stacker', stackerPath === '/' ? '/index.html' : stackerPath);
-      const ext = path.extname(staticPath);
-      fs.readFile(staticPath, (err, data) => {
-        if (err) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
-        res.end(data);
-      }); return;
-    }
-
-    // Kanban showcase — a self-contained static page (no backend). Mirrors the
-    // stacker/snake blocks: 301 the bare path to the trailing-slash form, then
-    // serve files from public/kanban/ with the shared MIME handling and 404s.
-    if (urlPath === '/kanban') {
-      res.writeHead(301, { Location: '/kanban/' });
-      res.end(); return;
-    }
-
-    if (urlPath.startsWith('/kanban/')) {
-      const kanbanPath = urlPath.slice(8) || '/';
-      const staticPath = path.join(PUBLIC_DIR, '/kanban', kanbanPath === '/' ? '/index.html' : kanbanPath);
-      const ext = path.extname(staticPath);
-      fs.readFile(staticPath, (err, data) => {
-        if (err) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
-        res.end(data);
-      }); return;
-    }
-
-    // Discord bot showcase — a self-contained static Discord UI mockup (no backend).
-    // Mirrors the kanban/stacker blocks: 301 the bare path to the trailing-slash form,
-    // then serve files from public/discord/ with the shared MIME handling and 404s.
-    if (urlPath === '/discord') {
-      res.writeHead(301, { Location: '/discord/' });
-      res.end(); return;
-    }
-
-    if (urlPath.startsWith('/discord/')) {
-      const discordPath = urlPath.slice(9) || '/';
-      const staticPath = path.join(PUBLIC_DIR, '/discord', discordPath === '/' ? '/index.html' : discordPath);
-      const ext = path.extname(staticPath);
-      fs.readFile(staticPath, (err, data) => {
-        if (err) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': MIME[ext] ?? 'application/octet-stream' });
-        res.end(data);
-      }); return;
+      if (urlPath.startsWith(`/${slug}/`)) {
+        const sub = urlPath.slice(slug.length + 2) || 'index.html';
+        const abs = safeJoin(PUBLIC_DIR, slug, sub);
+        if (abs === null) { res.writeHead(404); res.end('Not found'); return; }
+        serveFile(res, abs); return;
+      }
     }
 
     serveStatic(res, urlPath);
