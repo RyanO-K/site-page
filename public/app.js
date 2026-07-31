@@ -68,6 +68,7 @@ async function init() {
       setupAdminPanel();
       setupAboutEdit();
       setupContactEdit();
+      setupProjectEditModal();
     });
   }
 }
@@ -396,7 +397,11 @@ function buildGalleryCard(p) {
   const card = document.createElement('div');
   card.className = 'gallery-card';
   card.dataset.id = p.id;
-  card.addEventListener('click', () => { window.location.href = `/p/${p.id}`; });
+  card.addEventListener('click', () => {
+    // Admins edit in place; visitors go to the embed page.
+    if (currentUser) openProjectEditModal(p);
+    else window.location.href = `/p/${p.id}`;
+  });
 
   const langColor = LANG_COLORS[p.language] ?? '#888';
   const langBadge = p.language
@@ -426,7 +431,11 @@ function buildCard(p) {
   const card = document.createElement('div');
   card.className = 'project-card';
   card.dataset.id = p.id;
-  card.addEventListener('click', () => { window.location.href = `/p/${p.id}`; });
+  card.addEventListener('click', () => {
+    // Admins edit in place; visitors go to the embed page.
+    if (currentUser) openProjectEditModal(p);
+    else window.location.href = `/p/${p.id}`;
+  });
 
   const langColor = LANG_COLORS[p.language] ?? '#888';
   const langBadge = p.language
@@ -455,6 +464,72 @@ function buildCard(p) {
   }
 
   return card;
+}
+
+let editingProject = null;
+
+function openProjectEditModal(p) {
+  editingProject = p;
+  document.getElementById('edit-name').value = p.name;
+  document.getElementById('edit-description').value = p.description || '';
+  document.getElementById('edit-language').value = p.language || '';
+  document.getElementById('edit-url').value = p.url;
+  document.getElementById('edit-github-url').value = p.githubUrl;
+  dismissError();
+  document.getElementById('project-edit-modal').hidden = false;
+}
+
+function closeProjectEditModal() {
+  document.getElementById('project-edit-modal').hidden = true;
+  editingProject = null;
+}
+
+function setupProjectEditModal() {
+  const modal = document.getElementById('project-edit-modal');
+  const form = document.getElementById('project-edit-form');
+  const saveBtn = document.getElementById('edit-save');
+  const cancelBtn = document.getElementById('edit-cancel');
+
+  cancelBtn.addEventListener('click', closeProjectEditModal);
+
+  modal.addEventListener('click', e => {
+    if (e.target === modal) closeProjectEditModal();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !modal.hidden) closeProjectEditModal();
+  });
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!editingProject) return;
+    const patch = {
+      name: document.getElementById('edit-name').value.trim(),
+      description: document.getElementById('edit-description').value.trim(),
+      language: document.getElementById('edit-language').value.trim(),
+      url: document.getElementById('edit-url').value.trim(),
+      githubUrl: document.getElementById('edit-github-url').value.trim(),
+    };
+    const name = editingProject.name;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    dismissError();
+    try {
+      await apiFetch(`/api/projects/${editingProject.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      closeProjectEditModal();
+      await loadProjects();
+    } catch (err) {
+      // Keep the modal open so the edit is not lost while the banner explains.
+      reportError(`Saving "${name}"`, err);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  });
 }
 
 async function apiFetch(url, options) {

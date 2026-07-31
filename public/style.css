@@ -602,6 +602,102 @@ a:hover { text-decoration: underline; }
 
 #contact-cancel:hover { border-color: var(--text); color: var(--text); }
 
+/* ── Project Edit Modal ──────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1.5rem;
+}
+
+/* `display: flex` above and the UA's `[hidden] { display: none }` have equal
+   specificity, so the author rule wins and the backdrop renders even when the
+   attribute is set — a full-screen blur swallowing every click on every page
+   load. Any class that sets display needs this guard alongside it. */
+.modal-backdrop[hidden] { display: none; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  color: var(--text);
+}
+
+.modal-form { display: flex; flex-direction: column; gap: .9rem; }
+
+.modal-label {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  font-size: .8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.modal-input,
+.modal-textarea {
+  padding: .45rem .75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: .9rem;
+}
+
+.modal-input:focus,
+.modal-textarea:focus { outline: none; border-color: var(--accent); }
+
+.modal-textarea { resize: vertical; line-height: 1.5; }
+
+.modal-actions {
+  display: flex;
+  gap: .5rem;
+  margin-top: .25rem;
+}
+
+.modal-actions button[type="submit"] {
+  padding: .4rem 1.1rem;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: .875rem;
+}
+
+.modal-actions button[type="submit"]:disabled { opacity: .5; cursor: default; }
+
+.modal-actions .btn-ghost {
+  padding: .4rem 1rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .875rem;
+}
+
+.modal-actions .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+
 /* ── Drag-and-drop reorder ───────────────────────── */
 .project-card[draggable="true"],
 .gallery-card[draggable="true"] {

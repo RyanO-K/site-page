@@ -105,6 +105,40 @@
     <p>© 2026 Ryan O'Keefe · <a href="https://okeefe.work">okeefe.work</a></p>
   </footer>
 
+  <!-- Project edit modal (admin only). Errors go to the shared error banner
+       rather than an inline slot, so failures stay in one place. -->
+  <div id="project-edit-modal" class="modal-backdrop" hidden aria-modal="true" role="dialog" aria-labelledby="modal-title">
+    <div class="modal">
+      <h3 id="modal-title" class="modal-title">Edit Project</h3>
+      <form id="project-edit-form" class="modal-form">
+        <label class="modal-label">
+          Name
+          <input type="text" id="edit-name" class="modal-input" required />
+        </label>
+        <label class="modal-label">
+          Description
+          <textarea id="edit-description" class="modal-textarea" rows="3"></textarea>
+        </label>
+        <label class="modal-label">
+          Language
+          <input type="text" id="edit-language" class="modal-input" />
+        </label>
+        <label class="modal-label">
+          Hosted URL
+          <input type="url" id="edit-url" class="modal-input" required />
+        </label>
+        <label class="modal-label">
+          GitHub URL
+          <input type="url" id="edit-github-url" class="modal-input" required />
+        </label>
+        <div class="modal-actions">
+          <button type="submit" id="edit-save">Save</button>
+          <button type="button" id="edit-cancel" class="btn-ghost">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

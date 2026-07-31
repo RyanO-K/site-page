@@ -23,6 +23,7 @@ export interface Store {
   list(): Promise<Project[]>;
   add(project: Project): Promise<void>;
   remove(id: string): Promise<void>;
+  update(id: string, patch: Partial<Pick<Project, 'name' | 'description' | 'language' | 'url' | 'githubUrl'>>): Promise<void>;
   /** Persist a full reorder; ids must contain all project ids in the desired order. */
   reorder(ids: string[]): Promise<void>;
   getAbout(): Promise<string>;
@@ -64,6 +65,14 @@ class FileStore implements Store {
 
   async remove(id: string): Promise<void> {
     const all = (await this.list()).filter(p => p.id !== id);
+    fs.writeFileSync(this.file, JSON.stringify(all, null, 2));
+  }
+
+  async update(id: string, patch: Partial<Pick<Project, 'name' | 'description' | 'language' | 'url' | 'githubUrl'>>): Promise<void> {
+    const all = await this.list();
+    const idx = all.findIndex(p => p.id === id);
+    if (idx === -1) return;
+    all[idx] = { ...all[idx], ...patch };
     fs.writeFileSync(this.file, JSON.stringify(all, null, 2));
   }
 
@@ -160,6 +169,20 @@ class PgStore implements Store {
   async remove(id: string): Promise<void> {
     await this.ready;
     await this.pool.query('DELETE FROM projects WHERE id = $1', [id]);
+  }
+
+  async update(id: string, patch: Partial<Pick<Project, 'name' | 'description' | 'language' | 'url' | 'githubUrl'>>): Promise<void> {
+    await this.ready;
+    const cols = Object.entries({
+      name: patch.name, description: patch.description, language: patch.language,
+      url: patch.url, github_url: patch.githubUrl,
+    }).filter(([, v]) => v !== undefined);
+    if (!cols.length) return;
+    const sets = cols.map(([col], i) => `${col} = $${i + 2}`).join(', ');
+    await this.pool.query(
+      `UPDATE projects SET ${sets} WHERE id = $1`,
+      [id, ...cols.map(([, v]) => v)],
+    );
   }
 
   async reorder(ids: string[]): Promise<void> {

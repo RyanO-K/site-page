@@ -114,3 +114,22 @@ test('the delete button no longer drops its rejection', async () => {
   const js = await appJs();
   assert.match(js, /guard\(`Removing/);
 });
+
+// A class that sets `display` has the same specificity as the UA's
+// `[hidden] { display: none }`, and the author sheet wins — so the element
+// renders even with the attribute set. The edit modal shipped that way: a
+// full-screen blurred backdrop over every page load, swallowing every click.
+// Any overlay that sets display needs an explicit [hidden] guard.
+test('overlays that set display also guard the hidden attribute', async () => {
+  const css = await fetch(`${BASE}/style.css`).then((r) => r.text());
+
+  for (const sel of ['.modal-backdrop', '.error-banner']) {
+    const rule = new RegExp(`\\${sel}\\s*\\{[^}]*display\\s*:`);
+    if (!rule.test(css)) continue;   // no display rule, no hazard
+    assert.match(
+      css,
+      new RegExp(`\\${sel}\\[hidden\\]\\s*\\{\\s*display\\s*:\\s*none`),
+      `${sel} sets display, so it must also set ${sel}[hidden] { display: none }`,
+    );
+  }
+});
