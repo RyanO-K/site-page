@@ -10,7 +10,12 @@
   <header class="site-header">
     <nav class="nav">
       <span class="nav-logo">Ryan O'Keefe</span>
-      <ul class="nav-links">
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links">
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+      <ul class="nav-links" id="nav-links">
         <li><a href="#about">About</a></li>
         <li><a href="#projects">Projects</a></li>
         <li><a href="#contact">Contact</a></li>
@@ -57,7 +62,14 @@
         </div>
 
         <div id="project-grid" class="project-grid">
-          <!-- filled by JS -->
+          <!-- featured (first 3), filled by JS -->
+        </div>
+
+        <div id="gallery-wrap" hidden>
+          <h3 class="gallery-heading">More projects</h3>
+          <div id="project-gallery" class="project-gallery">
+            <!-- the rest, filled by JS -->
+          </div>
         </div>
       </div>
     </section>
