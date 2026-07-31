@@ -25,18 +25,24 @@ export interface Store {
   remove(id: string): Promise<void>;
   getAbout(): Promise<string>;
   setAbout(content: string): Promise<void>;
+  getContact(): Promise<string>;
+  setContact(content: string): Promise<void>;
 }
 
 const DEFAULT_ABOUT = `Currently exploring CI/CD pipelines and infrastructure as code.
 
 I build software with a focus on test driven development and user driven configuration.`;
 
+const DEFAULT_CONTACT = `<p>Reach me at <a href="mailto:rokeefe@okeefe.work">rokeefe@okeefe.work</a> or find me on <a href="https://github.com/RyanO-K" target="_blank" rel="noopener">GitHub</a>.</p>`;
+
 /** JSON-file backend. Newest-first is maintained by unshifting on add. */
 class FileStore implements Store {
   private readonly aboutFile: string;
+  private readonly contactFile: string;
 
   constructor(private readonly file: string) {
     this.aboutFile = file.replace(/projects\.json$/, 'about.md');
+    this.contactFile = file.replace(/projects\.json$/, 'contact.html');
   }
 
   async list(): Promise<Project[]> {
@@ -69,6 +75,18 @@ class FileStore implements Store {
 
   async setAbout(content: string): Promise<void> {
     fs.writeFileSync(this.aboutFile, content);
+  }
+
+  async getContact(): Promise<string> {
+    try {
+      return fs.readFileSync(this.contactFile, 'utf-8');
+    } catch {
+      return DEFAULT_CONTACT;
+    }
+  }
+
+  async setContact(content: string): Promise<void> {
+    fs.writeFileSync(this.contactFile, content);
   }
 }
 
@@ -141,6 +159,23 @@ class PgStore implements Store {
     await this.ready;
     await this.pool.query(
       `INSERT INTO settings (key, value) VALUES ('about', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [content],
+    );
+  }
+
+  async getContact(): Promise<string> {
+    await this.ready;
+    const { rows } = await this.pool.query(
+      `SELECT value FROM settings WHERE key = 'contact'`,
+    );
+    return rows[0]?.value ?? DEFAULT_CONTACT;
+  }
+
+  async setContact(content: string): Promise<void> {
+    await this.ready;
+    await this.pool.query(
+      `INSERT INTO settings (key, value) VALUES ('contact', $1)
        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
       [content],
     );
