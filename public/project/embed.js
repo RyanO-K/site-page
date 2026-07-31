@@ -1,5 +1,6 @@
-// Project embed shell. Reads the project id from /p/<id>, looks the project up
-// in /api/projects, and frames its url.
+// Project embed shell. Reads the project key from /p/<key>, looks the project
+// up in /api/projects, and frames its url. The key is the repo-name slug; ids
+// still resolve, so links shared before the switch keep working (see slug.js).
 //
 // The projects are hosted as separate Render services on the free plan, which
 // spin down after ~15 minutes idle. A cold one takes roughly 12-50s to answer
@@ -32,16 +33,16 @@ function fail(title, detail) {
   statusDetail.textContent = detail;
 }
 
-function idFromPath() {
-  // /p/<id> — tolerate a trailing slash and any stray sub-path.
+function keyFromPath() {
+  // /p/<key> — tolerate a trailing slash and any stray sub-path.
   const parts = window.location.pathname.split('/').filter(Boolean);
   return parts[1] ?? '';
 }
 
 async function main() {
-  const id = idFromPath();
-  if (!id) {
-    fail('No project specified', 'This page needs a project id, as in /p/<id>.');
+  const key = keyFromPath();
+  if (!key) {
+    fail('No project specified', 'This page needs a project, as in /p/<project>.');
     return;
   }
 
@@ -55,10 +56,17 @@ async function main() {
     return;
   }
 
-  const project = projects.find((p) => p.id === id);
+  const project = findProjectByKey(projects, key);
   if (!project) {
     fail('Project not found', 'No project matches this link. It may have been removed.');
     return;
+  }
+
+  // Canonicalize: an id link (or an odd-cased slug) rewrites to the slug url so
+  // what gets copied out of the address bar is the readable form.
+  const canonical = `/p/${projectSlug(project)}`;
+  if (window.location.pathname !== canonical) {
+    window.history.replaceState(null, '', canonical);
   }
 
   // Same-origin targets are pages of this site (the static /kanban and /discord

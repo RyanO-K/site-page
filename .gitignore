@@ -2,5 +2,3 @@ node_modules/
 dist/
 projects.json
 .claude/worktrees/
-scores.json
-stacker-scores.json

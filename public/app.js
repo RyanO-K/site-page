@@ -397,10 +397,11 @@ function buildGalleryCard(p) {
   const card = document.createElement('div');
   card.className = 'gallery-card';
   card.dataset.id = p.id;
+  const href = projectPath(p);
   card.addEventListener('click', () => {
     // Admins edit in place; visitors go to the embed page.
     if (currentUser) openProjectEditModal(p);
-    else window.location.href = `/p/${p.id}`;
+    else window.location.href = href;
   });
 
   const langColor = LANG_COLORS[p.language] ?? '#888';
@@ -415,7 +416,7 @@ function buildGalleryCard(p) {
       <p>${p.description || ''}</p>
     </div>
     <div class="gallery-actions">
-      <a class="btn" href="/p/${p.id}" onclick="event.stopPropagation()">Open</a>
+      <a class="btn" href="${href}" onclick="event.stopPropagation()">Open</a>
       <a class="btn btn-ghost" href="${p.githubUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">GitHub</a>
     </div>
   `;
@@ -431,10 +432,11 @@ function buildCard(p) {
   const card = document.createElement('div');
   card.className = 'project-card';
   card.dataset.id = p.id;
+  const href = projectPath(p);
   card.addEventListener('click', () => {
     // Admins edit in place; visitors go to the embed page.
     if (currentUser) openProjectEditModal(p);
-    else window.location.href = `/p/${p.id}`;
+    else window.location.href = href;
   });
 
   const langColor = LANG_COLORS[p.language] ?? '#888';
@@ -452,7 +454,7 @@ function buildCard(p) {
       ${langBadge ? `<div class="project-meta">${langBadge}</div>` : ''}
       <p>${p.description || ''}</p>
       <div style="margin-top:.75rem">
-        <a class="btn" href="/p/${p.id}" onclick="event.stopPropagation()">Open</a>
+        <a class="btn" href="${href}" onclick="event.stopPropagation()">Open</a>
         <a class="btn btn-ghost" href="${p.githubUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">GitHub</a>
       </div>
     </div>

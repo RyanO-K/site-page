@@ -4,7 +4,7 @@
 //
 // Spawns the compiled dist/server.js and asserts the trailing-slash form serves
 // the mockup HTML (200) and the bare path 301-redirects to it — mirroring the
-// kanban/stacker/snake routing.
+// kanban/discord routing.
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';

@@ -3,7 +3,7 @@
 //
 // Spawns the compiled dist/server.js and asserts the trailing-slash form serves
 // the board HTML (200) and the bare path 301-redirects to it — mirroring the
-// stacker/snake routing.
+// discord routing.
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';

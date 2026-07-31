@@ -6,8 +6,6 @@ import { createStore, Project } from './store';
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
-const SCORES_FILE = path.resolve(__dirname, '../scores.json');
-const STACKER_SCORES_FILE = path.resolve(__dirname, '../stacker-scores.json');
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!;
@@ -17,36 +15,6 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const store = createStore();
 const sessions = new Map<string, string>();
 const oauthStates = new Set<string>();
-
-interface ScoreEntry { name: string; score: number; timestamp: number; }
-interface ScoreBoard { entries: ScoreEntry[]; highScore: number; }
-const MAX_HIGH_SCORES = 10;
-
-function readScoreBoard(): ScoreBoard {
-  try {
-    const raw = fs.readFileSync(SCORES_FILE, 'utf-8');
-    return JSON.parse(raw) as ScoreBoard;
-  } catch {
-    return { entries: [], highScore: 0 };
-  }
-}
-
-function writeScoreBoard(board: ScoreBoard): void {
-  fs.writeFileSync(SCORES_FILE, JSON.stringify(board, null, 2), 'utf-8');
-}
-
-function readStackerScoreBoard(): ScoreBoard {
-  try {
-    const raw = fs.readFileSync(STACKER_SCORES_FILE, 'utf-8');
-    return JSON.parse(raw) as ScoreBoard;
-  } catch {
-    return { entries: [], highScore: 0 };
-  }
-}
-
-function writeStackerScoreBoard(board: ScoreBoard): void {
-  fs.writeFileSync(STACKER_SCORES_FILE, JSON.stringify(board, null, 2), 'utf-8');
-}
 
 /** Accept "owner/name", a full github.com URL, or a trailing .git — return "owner/name". */
 function normalizeRepo(input: string): string {
@@ -106,7 +74,17 @@ const MIME: Record<string, string> = {
 // database lookup: the assets ship with the deploy, so the set of real routes
 // is fixed at build time. (Slugs also index the filesystem — sourcing them from
 // user-writable rows would turn a project insert into a file-read primitive.)
-const SHOWCASES = ['snake', 'stacker', 'kanban', 'discord'];
+const SHOWCASES = ['kanban', 'discord'];
+
+// Retired showcases. snake and stacker used to be committed copies under
+// public/; they are now separately-hosted Render services reached through the
+// /p/<slug> embed page. The old paths were linkable, so they redirect rather
+// than 404 — and the redirect target is the slug, not a project id, so it keeps
+// working if the row is ever recreated.
+const RETIRED_SHOWCASES: Record<string, string> = {
+  snake: 'snake-game',
+  stacker: 'stacker-game',
+};
 
 /**
  * Join untrusted url segments under `root`, or return null if the result
@@ -318,61 +296,11 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { ok: true }); return;
     }
 
-    if (method === 'GET' && urlPath === '/snake/api/scores') {
-      const board = readScoreBoard();
-      json(res, 200, board); return;
-    }
-
-    if (method === 'POST' && urlPath === '/snake/api/scores') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', () => {
-        try {
-          const entry = JSON.parse(body) as ScoreEntry;
-          const board = readScoreBoard();
-          const merged = [...board.entries, entry]
-            .sort((a, b) => b.score - a.score || a.timestamp - b.timestamp)
-            .slice(0, MAX_HIGH_SCORES);
-          const updated: ScoreBoard = { entries: merged, highScore: merged[0]?.score ?? 0 };
-          writeScoreBoard(updated);
-          json(res, 200, updated);
-        } catch {
-          res.writeHead(400);
-          res.end('Bad request');
-        }
-      }); return;
-    }
-
-    if (method === 'GET' && urlPath === '/stacker/api/scores') {
-      const board = readStackerScoreBoard();
-      json(res, 200, board); return;
-    }
-
-    if (method === 'POST' && urlPath === '/stacker/api/scores') {
-      let body = '';
-      req.on('data', chunk => { body += chunk; });
-      req.on('end', () => {
-        try {
-          const entry = JSON.parse(body) as ScoreEntry;
-          const board = readStackerScoreBoard();
-          const merged = [...board.entries, entry]
-            .sort((a, b) => b.score - a.score || a.timestamp - b.timestamp)
-            .slice(0, MAX_HIGH_SCORES);
-          const updated: ScoreBoard = { entries: merged, highScore: merged[0]?.score ?? 0 };
-          writeStackerScoreBoard(updated);
-          json(res, 200, updated);
-        } catch {
-          res.writeHead(400);
-          res.end('Bad request');
-        }
-      }); return;
-    }
-
-    // Project pages: /p/<id> embeds a separately-hosted project in an iframe.
-    // One static shell for every project — it reads the id from the url and
+    // Project pages: /p/<slug> embeds a separately-hosted project in an iframe.
+    // One static shell for every project — it reads the slug from the url and
     // looks the embed target up in /api/projects, so adding a project is a
     // database row, not a deploy. Any /p/... path serves the same shell; the
-    // client 404s an unknown id itself.
+    // client 404s an unknown slug itself.
     if (urlPath === '/p' || urlPath === '/p/') {
       res.writeHead(302, { Location: '/#projects' });
       res.end(); return;
@@ -382,9 +310,17 @@ const server = http.createServer(async (req, res) => {
       serveFile(res, path.join(PUBLIC_DIR, 'project', 'index.html')); return;
     }
 
-    // Static showcase routes (see SHOWCASES). This runs after the per-game
-    // scores APIs above, so /snake/api/scores and /stacker/api/scores are
-    // already handled and never fall through to a file lookup here.
+    // Retired showcases (see RETIRED_SHOWCASES) — permanently moved to their
+    // own hosts. Sub-paths collapse to the project page too: nothing under the
+    // old prefix exists on this origin any more.
+    for (const [old, slug] of Object.entries(RETIRED_SHOWCASES)) {
+      if (urlPath === `/${old}` || urlPath.startsWith(`/${old}/`)) {
+        res.writeHead(301, { Location: `/p/${slug}` });
+        res.end(); return;
+      }
+    }
+
+    // Static showcase routes (see SHOWCASES).
     for (const slug of SHOWCASES) {
       if (urlPath === `/${slug}`) {
         res.writeHead(301, { Location: `/${slug}/` });

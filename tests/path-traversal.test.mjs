@@ -62,8 +62,9 @@ function rawGet(rawPath) {
     socket.on('data', (chunk) => { data += chunk.toString(); });
     socket.on('end', () => {
       const status = Number(data.split(' ')[1]);
+      const head = data.slice(0, data.indexOf('\r\n\r\n'));
       const body = data.slice(data.indexOf('\r\n\r\n') + 4);
-      resolve({ status, body });
+      resolve({ status, head, body });
     });
     socket.on('error', reject);
   });
@@ -75,8 +76,6 @@ after(() => { proc?.kill(); });
 
 const ESCAPES = [
   '/kanban/../../package.json',
-  '/snake/../../package.json',
-  '/stacker/../../package.json',
   '/discord/../../package.json',
   '/../package.json',
   '/kanban/../../src/server.ts',
@@ -91,9 +90,27 @@ for (const rawPath of ESCAPES) {
   });
 }
 
+// The retired showcases redirect their whole prefix to the project page, so a
+// traversal underneath one is answered before any file lookup happens. Different
+// status, same guarantee: no file leaves the server.
+const RETIRED_ESCAPES = [
+  ['/snake/../../package.json', '/p/snake-game'],
+  ['/stacker/../../package.json', '/p/stacker-game'],
+];
+
+for (const [rawPath, location] of RETIRED_ESCAPES) {
+  test(`raw GET ${rawPath} redirects instead of serving a file`, async () => {
+    const { status, head, body } = await rawGet(rawPath);
+    assert.equal(status, 301, `${rawPath} should redirect, got ${status}`);
+    assert.match(head, new RegExp(`Location: ${location}`, 'i'));
+    assert.doesNotMatch(body, /"name":\s*"site-page"/, 'must not leak package.json');
+    assert.doesNotMatch(body, /createServer/, 'must not leak server source');
+  });
+}
+
 // The fix must not break ordinary nested asset serving.
 test('normal showcase assets still serve', async () => {
-  const { status } = await rawGet('/snake/bundle.js');
+  const { status } = await rawGet('/kanban/index.html');
   assert.equal(status, 200);
 });
 
