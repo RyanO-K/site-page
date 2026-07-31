@@ -276,6 +276,11 @@ const server = http.createServer(async (req, res) => {
       }); return;
     }
 
+    if (urlPath === '/snake') {
+      res.writeHead(301, { Location: '/snake/' });
+      res.end(); return;
+    }
+
     if (urlPath.startsWith('/snake/')) {
       const snakePath = urlPath.slice(7) || '/';
       const staticPath = path.join(PUBLIC_DIR, '/snake', snakePath === '/' ? '/index.html' : snakePath);
