@@ -1,4 +1,5 @@
 import http from 'http';
+import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import { randomBytes } from 'crypto';
@@ -111,6 +112,113 @@ function serveStatic(res: http.ServerResponse, urlPath: string): void {
   const abs = safeJoin(PUBLIC_DIR, urlPath === '/' ? '/index.html' : urlPath);
   if (abs === null) { res.writeHead(404); res.end('Not found'); return; }
   serveFile(res, abs);
+}
+
+// ---------------------------------------------------------------------------
+// /board — reverse proxy to the kanban-cloud shared board.
+//
+// Auth model: the logged-in GitHub owner gets full interactive access (the
+// upstream trusts our X-Proxy-User header); everyone else spectates read-only
+// (X-Proxy-Readonly: 1, GET/HEAD only). X-Proxy-Secret is a shared secret that
+// authenticates this proxy to the upstream, so the upstream can refuse traffic
+// that didn't come through here. Both env vars are set on Render; when either
+// is missing the route degrades to a friendly 503 instead of proxying.
+// ---------------------------------------------------------------------------
+
+/** Hop-by-hop headers (RFC 7230 §6.1) — meaningful only for a single
+ * connection, so they must not be forwarded in either direction. */
+const HOP_BY_HOP = new Set([
+  'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
+  'te', 'trailer', 'trailers', 'transfer-encoding', 'upgrade',
+]);
+
+const BOARD_UPSTREAM_TIMEOUT_MS = 15_000;
+
+function proxyBoard(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  urlPath: string,
+  queryString: string | undefined,
+): void {
+  const base = process.env.KANBAN_CLOUD_URL;
+  const secret = process.env.KANBAN_CLOUD_SECRET;
+
+  let target: URL | null = null;
+  if (base) { try { target = new URL(base); } catch { target = null; } }
+  if (!target || !secret) {
+    res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('The shared board is not configured on this deployment yet — check back soon.');
+    return;
+  }
+
+  // Rewrite /board/<rest> → /<rest> on the upstream. Reject any dot-dot
+  // segment (raw or percent-encoded): the prefix match happens on the raw
+  // request path, so without this a crafted /board/../... path would be
+  // forwarded with traversal segments intact.
+  const rest = urlPath.slice('/board'.length) || '/';
+  const hasDotDot = rest.split('/').some(seg => {
+    let decoded = seg;
+    try { decoded = decodeURIComponent(seg); } catch { /* keep raw */ }
+    return seg === '..' || decoded === '..';
+  });
+  if (hasDotDot) { res.writeHead(404); res.end('Not found'); return; }
+
+  const method = (req.method ?? 'GET').toUpperCase();
+  const user = getSessionUser(req);
+  if (!user && method !== 'GET' && method !== 'HEAD') {
+    json(res, 401, { error: 'Spectator mode is read-only — log in to interact with the board' });
+    return;
+  }
+
+  // Forward content/conditional headers but drop: hop-by-hop headers, Host
+  // (must match the upstream), every cookie (the site session cookie must
+  // never reach the upstream), and any client-supplied X-Proxy-* header
+  // (those are this proxy's to assert, not the caller's).
+  const headers: http.OutgoingHttpHeaders = {};
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (value === undefined) continue;
+    const lower = name.toLowerCase();
+    if (HOP_BY_HOP.has(lower) || lower === 'cookie' || lower === 'host') continue;
+    if (lower.startsWith('x-proxy-')) continue;
+    headers[name] = value;
+  }
+  headers['x-proxy-secret'] = secret;
+  if (user) headers['x-proxy-user'] = user;
+  else headers['x-proxy-readonly'] = '1';
+
+  const lib = target.protocol === 'https:' ? https : http;
+  const upstreamPath =
+    target.pathname.replace(/\/+$/, '') + rest + (queryString ? `?${queryString}` : '');
+
+  const upstream = lib.request({
+    hostname: target.hostname,
+    port: target.port || (target.protocol === 'https:' ? 443 : 80),
+    method,
+    path: upstreamPath,
+    headers,
+    timeout: BOARD_UPSTREAM_TIMEOUT_MS,
+  }, upstreamRes => {
+    const resHeaders: http.OutgoingHttpHeaders = {};
+    for (const [name, value] of Object.entries(upstreamRes.headers)) {
+      if (value === undefined || HOP_BY_HOP.has(name.toLowerCase())) continue;
+      resHeaders[name] = value;
+    }
+    res.writeHead(upstreamRes.statusCode ?? 502, resHeaders);
+    upstreamRes.pipe(res);
+  });
+
+  upstream.on('timeout', () => upstream.destroy(new Error('board upstream timed out')));
+  upstream.on('error', err => {
+    console.error(`[board] upstream error: ${err.message}`);
+    if (!res.headersSent) {
+      json(res, 502, { error: 'The board is unreachable right now — try again shortly' });
+    } else {
+      res.destroy();
+    }
+  });
+
+  // Stream the request body straight through (nothing has consumed req yet).
+  req.pipe(upstream);
 }
 
 function json(res: http.ServerResponse, status: number, body: unknown): void {
@@ -294,6 +402,17 @@ const server = http.createServer(async (req, res) => {
       const id = urlPath.split('/').pop();
       if (id) await store.remove(id);
       json(res, 200, { ok: true }); return;
+    }
+
+    // Shared kanban board, reverse-proxied to kanban-cloud (see proxyBoard).
+    if (urlPath === '/board') {
+      res.writeHead(301, { Location: `/board/${queryString ? `?${queryString}` : ''}` });
+      res.end(); return;
+    }
+
+    if (urlPath.startsWith('/board/')) {
+      proxyBoard(req, res, urlPath, queryString);
+      return;
     }
 
     // Project pages: /p/<slug> embeds a separately-hosted project in an iframe.
