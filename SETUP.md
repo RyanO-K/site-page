@@ -34,8 +34,30 @@ Set these in your Render service → Environment (or via `render.yaml`):
 | `DATABASE_URL`         | Neon connection string (with `?sslmode=require`)               |
 | `NODE_ENV`             | `production`                                                    |
 | `GITHUB_TOKEN`         | optional — raises GitHub API rate limit / allows private repos |
+| `KANBAN_CLOUD_URL`     | base URL of the kanban-cloud service (for the `/board` proxy)  |
+| `KANBAN_CLOUD_SECRET`  | shared secret the proxy sends as `X-Proxy-Secret`              |
 
 Render sets `PORT` automatically — no need to add it.
+
+### The `/board` reverse proxy
+
+`/board/` serves the kanban-cloud shared board through a reverse proxy built on
+`node:http`/`node:https` (no extra dependencies). `/board/<rest>` is rewritten to
+`/<rest>` on `KANBAN_CLOUD_URL`, preserving method, query string, body, and content
+headers; hop-by-hop headers and dot-dot path segments are rejected. If either
+`KANBAN_CLOUD_*` var is unset the route answers 503 instead of proxying.
+
+Auth model — the upstream trusts headers only this proxy can set:
+
+- Every forwarded request carries `X-Proxy-Secret: $KANBAN_CLOUD_SECRET`, so the
+  upstream can refuse traffic that didn't come through the proxy.
+- Logged-in owner: requests carry `X-Proxy-User: <github login>` and any method
+  is forwarded (full interactive access).
+- Everyone else spectates read-only: `X-Proxy-Readonly: 1`, only `GET`/`HEAD`
+  are forwarded, and other methods get a 401 asking them to log in.
+- All cookies (including the site `session` cookie) are stripped before
+  forwarding, and client-supplied `X-Proxy-*` headers are discarded, so callers
+  cannot spoof identity to the upstream.
 
 ## 4. Deploy
 
