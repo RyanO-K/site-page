@@ -93,6 +93,16 @@ function setupNav() {
 
 function renderAuth() {
   const item = document.getElementById('auth-item');
+
+  // Board link for everyone — spectators may watch read-only; the proxy grants
+  // interactive access only to the logged-in owner. Sits before the auth item.
+  if (!document.getElementById('board-item')) {
+    const board = document.createElement('li');
+    board.id = 'board-item';
+    board.innerHTML = '<a href="/board/">Board</a>';
+    item.parentNode.insertBefore(board, item);
+  }
+
   if (currentUser) {
     item.innerHTML = `<button id="logout-btn">Log out</button>`;
     document.getElementById('logout-btn').addEventListener('click', async () => {
