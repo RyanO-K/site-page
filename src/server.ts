@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomBytes } from 'crypto';
 import { createStore, Project } from './store';
+import { safeReturnPath, DEFAULT_RETURN } from './auth-return';
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
@@ -15,7 +16,7 @@ const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 
 const store = createStore();
 const sessions = new Map<string, string>();
-const oauthStates = new Set<string>();
+const oauthStates = new Map<string, string>();
 
 /** Accept "owner/name", a full github.com URL, or a trailing .git — return "owner/name". */
 function normalizeRepo(input: string): string {
@@ -242,7 +243,7 @@ const server = http.createServer(async (req, res) => {
   try {
     if (method === 'GET' && urlPath === '/auth/github') {
       const state = randomBytes(16).toString('hex');
-      oauthStates.add(state);
+      oauthStates.set(state, safeReturnPath(params.get('return')));
       setTimeout(() => oauthStates.delete(state), 10 * 60 * 1000);
       res.writeHead(302, { Location: `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=read:user&state=${state}` });
       res.end(); return;
@@ -251,6 +252,7 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && urlPath === '/auth/callback') {
       const code = params.get('code'), state = params.get('state');
       if (!code || !state || !oauthStates.has(state)) { res.writeHead(400); res.end('Invalid OAuth state'); return; }
+      const returnTo = oauthStates.get(state) ?? DEFAULT_RETURN;
       oauthStates.delete(state);
 
       const tokenData = await fetchJson('https://github.com/login/oauth/access_token', {
@@ -266,7 +268,7 @@ const server = http.createServer(async (req, res) => {
       const token = randomBytes(32).toString('hex');
       sessions.set(token, ghUser.login);
       setCookie(res, token);
-      res.writeHead(302, { Location: '/#projects' });
+      res.writeHead(302, { Location: returnTo });
       res.end(); return;
     }
 
